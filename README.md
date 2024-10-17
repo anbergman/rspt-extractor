@@ -1,6 +1,6 @@
 # RSPt Extractor
 
-**Version:** 0.1.0
+**Version:** 0.2.0
 **Author:** Anders Bergman
 
 ## Overview
@@ -21,3 +21,14 @@ To install `rspt-extractor`, use the following command after cloning the reposit
 
 ```bash
 pip install -e .
+```
+
+## Usage
+
+The classes included in the package can be customized to your preferred directory structure. Assuming the default structure for relativistic calculations i.e. three folders named `spin-001`, `spin-010`, and `spin-100`, then the built-in script `rspt-runner` can be invoked as
+
+```bash
+rspt-runner
+```
+
+This should work for the included examples.
