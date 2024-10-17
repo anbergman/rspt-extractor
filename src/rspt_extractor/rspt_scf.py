@@ -7,8 +7,11 @@ processing the extracted data, and saving the processed data to an output file.
 
 import importlib.resources
 import numpy as np
-from .rspt_extract import extract_moments, extract_basis_vectors, extract_bravais_lattice_matrix
-#import rspt_extract as rs
+from .rspt_extract import (
+    extract_moments,
+    extract_basis_vectors,
+    extract_bravais_lattice_matrix,
+)
 
 
 class RsptScf:
@@ -53,7 +56,7 @@ class RsptScf:
             moments (list or None): The magnetic moments, initialized as None.
 
         Methods:
-            extract_data(): Extracts data from the file and populates the 
+            extract_data(): Extracts data from the file and populates the
                             attributes.
 
         Author: Anders Bergman
@@ -67,13 +70,13 @@ class RsptScf:
 
     def extract_data(self):
         """
-        Extracts and sets the lattice matrix, basis vectors, and moments from 
+        Extracts and sets the lattice matrix, basis vectors, and moments from
         the specified file.
 
-        This method reads the file located at `self.file_path` and extracts 
-        the Bravais lattice matrix, basis vectors, and magnetic moments using 
-        the `rs` module's extraction functions. The extracted data is then 
-        assigned to the instance variables `self.alat`, `self.lattice`, 
+        This method reads the file located at `self.file_path` and extracts
+        the Bravais lattice matrix, basis vectors, and magnetic moments using
+        the `rs` module's extraction functions. The extracted data is then
+        assigned to the instance variables `self.alat`, `self.lattice`,
         `self.basis`, and `self.moments`.
 
         Args:
@@ -89,8 +92,7 @@ class RsptScf:
         Author:
             Anders Bergman
         """
-        self.alat, self.lattice = extract_bravais_lattice_matrix(
-            self.file_path)
+        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_path)
         self.basis = extract_basis_vectors(self.file_path)
         self.moments = extract_moments(self.file_path)
 
@@ -102,7 +104,7 @@ class RsptScf:
         using a fixed format for floating-point numbers.
 
         Args:
-            output_path (str): The path to the file where the lattice 
+            output_path (str): The path to the file where the lattice
                        configuration will be saved.
 
         Returns:
@@ -119,11 +121,11 @@ class RsptScf:
         """
         Save atomic positions to a file.
 
-        This method iterates over the atomic basis positions, formats them, and 
+        This method iterates over the atomic basis positions, formats them, and
         saves them to a specified output file.
 
         Args:
-            output_path (str): The path to the output file where the positions 
+            output_path (str): The path to the output file where the positions
                 will be saved.
 
         Returns:
@@ -138,9 +140,9 @@ class RsptScf:
         posdata = []
         for i, pos in enumerate(self.basis):
             posdata.append(np.hstack([i + 1, i + 1, pos]))
-        np.savetxt(output_path,
-                   np.array(posdata),
-                   fmt="%4d %4d  % 10.6f % 10.6f % 10.6f")
+        np.savetxt(
+            output_path, np.array(posdata), fmt="%4d %4d  % 10.6f % 10.6f % 10.6f"
+        )
 
     def print_moments(self, output_path):
         """
@@ -177,11 +179,11 @@ class RsptScf:
 
     def print_template(self, posfile, momfile, exchange, file_path):
         """
-        Generates and writes a formatted output file based on a template and 
+        Generates and writes a formatted output file based on a template and
         provided parameters.
 
-        This method reads a template file, substitutes placeholders with 
-        corresponding values from the provided parameters and the object's 
+        This method reads a template file, substitutes placeholders with
+        corresponding values from the provided parameters and the object's
         lattice attribute, and writes the formatted output to a specified file.
 
         Args:
@@ -192,7 +194,7 @@ class RsptScf:
 
         Raises:
             FileNotFoundError: If the template file is not found.
-            IOError: If there is an error reading the template file or writing 
+            IOError: If there is an error reading the template file or writing
                      the output file.
 
         Author: Anders Bergman
@@ -214,8 +216,9 @@ class RsptScf:
         }
 
         # Read the template from the package using importlib.resources
-        with importlib.resources.files("rspt").joinpath("inpsd.template").open(
-                "r", encoding="utf-8") as file:
+        with importlib.resources.files("rspt_extractor").joinpath(
+            "inpsd.template"
+        ).open("r", encoding="utf-8") as file:
             template = file.read()
         # Read the template from the external file
         #   with open("inpsd.template", "r", encoding="utf-8") as file:
@@ -237,5 +240,4 @@ if __name__ == "__main__":
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")
     rspt_exchange.print_moments("momfile")
-    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat",
-                                 "inpsd.minimal")
+    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")

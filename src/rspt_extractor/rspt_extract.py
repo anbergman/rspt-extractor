@@ -1,36 +1,58 @@
 """
-This module contains core routines for extracting data from RPSt output.
+Module for extracting and transforming data from RSPT output files.
 
-The functions in this module are designed to extract various data from files generated
-by RPSt calculations.  These calculations involve extracting and transforming matrices,
-extracting lattice constants and matrices, extracting basis vectors, extracting distance
-vectors, extracting exchange matrices, and converting atomic coordinates to maptype three.
+This module provides functions to extract various types of data from RSPT
+output files, including Bravais lattice matrices, magnetic moments, basis
+vectors, distance vectors, and exchange matrices. It also includes functions
+to transform matrices and convert atomic positions to a specific map type.
 
-The main functions in this module are:
-- flatten_and_concatenate: Flattens and concatenates elements of a list.
-- transform_matrix: Transforms a given matrix according to a specific formula.
-- extract_bravais_lattice_matrix: Extracts the bravais lattice matrix from a file.
-- extract_basis_vectors: Extracts basis vectors from a file.
-- extract_distance_vectors: Extracts vectors from a file.
-- extract_exchange_matrices: Extracts matrices from a file containing calculated quantities.
-- convert_to_maptype_three: Converts atomic coordinates to maptype three.
+Functions:
+    flatten_and_concatenate(input_list: list) -> np.ndarray:
 
-Each function is documented with its parameters, return types, and a
-brief description of its functionality.
+    transform_matrix(matrix: np.ndarray) -> np.ndarray:
+
+    extract_bravais_lattice_matrix(file_path: str) -> tuple:
+
+    extract_moments(file_path: str) -> np.ndarray:
+
+    extract_basis_vectors(file_path: str) -> np.ndarray:
+
+    extract_distance_vectors(file_path: str) -> tuple:
+
+    extract_exchange_matrices(file_path: str) -> list:
+
+    convert_to_maptype_three(j_atoms: list, basis: np.ndarray, lattice: np.ndarray,
+                             alat: float, r_ij: np.ndarray) -> np.ndarray:
 """
-
 import numpy as np
 
 
 def flatten_and_concatenate(input_list):
     """
-    Flattens and concatenates the elements of the input list.
+    Flattens and concatenates elements from the input list.
+
+    This function takes a list of elements, where each element can be either
+    a numpy ndarray or any other type. If an element is an ndarray, it is
+    flattened and its elements are added to the result list. If an element is
+    not an ndarray, it is directly added to the result list. The final result
+    is returned as a numpy array.
 
     Args:
-        input_list (list): The input list containing elements to be flattened and concatenated.
+        input_list (list): A list containing elements that are either numpy
+            ndarrays or other types.
 
     Returns:
-        numpy.ndarray: The flattened and concatenated array.
+        np.ndarray: A numpy array containing the flattened and concatenated
+            elements from the input list.
+
+    Example:
+        >>> import numpy as np
+        >>> input_list = [np.array([1, 2]), 3, np.array([4, 5])]
+        >>> flatten_and_concatenate(input_list)
+        array([1, 2, 3, 4, 5])
+
+    Author:
+        Anders Bergman
     """
     flattened_elements = []
     for item in input_list:
@@ -43,13 +65,34 @@ def flatten_and_concatenate(input_list):
 
 def transform_matrix(matrix):
     """
-    Transforms the given matrix according to a specific formula.
+    Transforms a 3x3 matrix according to a specific formula.
+
+    This function takes a 3x3 matrix and applies a transformation to it,
+    resulting in a new 3x3 matrix. The transformation is defined by the
+    following formula:
+
+    transformed_matrix = [
+        [jx, cz + dz, cy - dy],
+        [cz - dz, jy, cx + dx],
+        [cy + dy, cx - dx, jz]
+    ]
 
     Args:
-        matrix (numpy.ndarray): The input matrix.
+        matrix (np.ndarray): A 3x3 numpy array representing the original matrix.
 
     Returns:
-        numpy.ndarray: The transformed matrix.
+        np.ndarray: A 3x3 numpy array representing the transformed matrix.
+
+    Example:
+        >>> import numpy as np
+        >>> matrix = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        >>> transform_matrix(matrix)
+        array([[ 1, 15, -1],
+               [-1,  5,  5],
+               [11, -1,  9]])
+
+    Author:
+        Anders Bergman
     """
     # Extract the elements from the original matrix
     jx, dx, cx = matrix[0]
@@ -66,13 +109,35 @@ def transform_matrix(matrix):
 
 def extract_bravais_lattice_matrix(file_path):
     """
-    Extracts the bravais lattice matrix from the given file.
+    Extracts the Bravais lattice matrix from a given file.
+
+    This function reads a file specified by `file_path` and extracts the Bravais
+    lattice matrix along with the lattice constant (alat). The file is expected
+    to contain a section labeled "Bravais lattice basis" followed by three lines
+    of floating point numbers representing the matrix.
 
     Args:
-        file_path (str): The path to the file.
+        file_path (str): The path to the file containing the Bravais lattice
+                         matrix data.
 
     Returns:
-        tuple: A tuple containing the lattice constant and the lattice matrix.
+        tuple: A tuple containing:
+            - alat (float): The lattice constant.
+            - matrix (numpy.ndarray): A 3x3 numpy array representing the Bravais
+                                      lattice matrix.
+
+    Raises:
+        FileNotFoundError: If the file specified by `file_path` does not exist.
+        ValueError: If the file does not contain the expected Bravais lattice
+                    matrix data.
+
+    Example:
+        >>> alat, matrix = extract_bravais_lattice_matrix("path/to/file.txt")
+        >>> print(alat)
+        >>> print(matrix)
+
+    Author:
+        Anders Bergman
     """
     print("Extracting bravais lattice matrix from:", file_path)
     with open(file_path, "r", encoding="utf-8") as file:
@@ -101,14 +166,34 @@ def extract_bravais_lattice_matrix(file_path):
 
 def extract_moments(file_path):
     """
-    Extracts magnetic moments from a file.
+    Extracts magnetic moments from a specified file.
 
-    Parameters:
-    file_path (str): The path to the file containing the basis vectors.
+    This function reads a file containing magnetic moment data and extracts the
+    spin, orbital, and total moments. The data is expected to be in a specific
+    format where the line containing "type           spin     orbital       total"
+    marks the beginning of the relevant data section.
+
+    Args:
+        file_path (str): The path to the file containing the magnetic moment data.
 
     Returns:
-    numpy.ndarray: An array of magnetic moments
+        np.ndarray: A NumPy array of shape (n, 3) where n is the number of data
+        points. Each row contains the spin, orbital, and total moments as
+        floating-point numbers.
 
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        ValueError: If the data format in the file is incorrect.
+
+    Example:
+        >>> moments = extract_moments("path/to/datafile.txt")
+        >>> print(moments)
+        [[0.1, 0.2, 0.3],
+         [0.4, 0.5, 0.6],
+         ...]
+
+    Author:
+        Anders Bergman
     """
     with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
@@ -186,6 +271,7 @@ def extract_distance_vectors(file_path):
     r_ij = []
     d_ij = []
     i_atom = 0
+    r_i = 0.0
     j_atom = []
     r_ij = []
     capture_glob = False
@@ -211,14 +297,32 @@ def extract_distance_vectors(file_path):
 
 def extract_exchange_matrices(file_path):
     """
-    Extracts matrices from a file containing calculated quantities in a global coordinate system.
+    Extracts exchange matrices from a specified file.
+
+    This function reads a file containing calculated quantities in the global
+    coordinate system and extracts exchange matrices. The matrices are
+    identified by specific markers in the file and are returned as a list of
+    NumPy arrays.
 
     Args:
-        file_path (str): The path to the file containing the calculated quantities.
+        file_path (str): The path to the file containing the exchange matrices.
 
     Returns:
-        list: A list of numpy arrays representing the extracted matrices.
+        List[np.ndarray]: A list of 3x3 NumPy arrays representing the exchange
+        matrices.
 
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        ValueError: If the file contains invalid data that cannot be parsed
+        into matrices.
+
+    Example:
+        >>> matrices = extract_exchange_matrices("path/to/file.txt")
+        >>> for matrix in matrices:
+        >>>     print(matrix)
+
+    Author:
+        Anders Bergman
     """
     with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
@@ -251,27 +355,32 @@ def extract_exchange_matrices(file_path):
     return matrices
 
 
-def convert_to_maptype_three(i_atom, j_atoms, basis, lattice, alat, r_ij):
+def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
     """
-    Converts the given atomic coordinates to maptype three.
+    Converts atomic positions to a specific map type (type three).
 
-    Parameters:
-    i_atom (int): Index of the central atom.
-    j_atoms (list): List of indices of the neighboring atoms.
-    basis (list): List of atomic coordinates.
-    lattice (ndarray): Lattice vectors.
-    alat (float): Lattice constant.
-    r_ij (ndarray): Relative positions of the neighboring atoms.
+    This function takes in atomic positions and lattice parameters to compute
+    the mapped positions in a new coordinate system.
+
+    Args:
+        j_atoms (list[int]): List of atom indices.
+        basis (np.ndarray): Basis vectors of the atomic positions.
+        lattice (np.ndarray): Lattice vectors of the crystal.
+        alat (float): Lattice constant.
+        r_ij (np.ndarray): Relative positions between atoms.
 
     Returns:
-    ndarray: Array of converted atomic coordinates.
+        np.ndarray: Transformed atomic positions in the new coordinate system,
+        rounded to 4 decimal places.
 
+    Author:
+        Anders Bergman
     """
     invlatt = np.linalg.inv(lattice)
     basis[:, 2] = -basis[:, 2]
     s_ij = []
     for idx, vector in enumerate(r_ij):
-        r_i = np.dot(lattice, basis[i_atom - 1])
+        # r_i = np.dot(lattice, basis[i_atom - 1])
         r_j = np.dot(lattice, basis[j_atoms[idx] - 1])
         r_shift = vector / alat
         v_ij = r_shift - r_j  # - r_i

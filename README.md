@@ -1,6 +1,6 @@
 # RSPt Extractor
 
-**Version:** 0.1.0  
+**Version:** 0.1.0
 **Author:** Anders Bergman
 
 ## Overview
@@ -21,4 +21,3 @@ To install `rspt-extractor`, use the following command after cloning the reposit
 
 ```bash
 pip install -e .
-

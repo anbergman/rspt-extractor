@@ -1,9 +1,9 @@
 """
-This module provides functionality to extract, process, and save exchange data 
-from a specified file. It includes the RsptExchange class and several utility 
+This module provides functionality to extract, process, and save exchange data
+from a specified file. It includes the RsptExchange class and several utility
 functions for handling exchange matrices and projections.
 Classes:
-    RsptExchange: A class to handle extraction, processing, and saving of 
+    RsptExchange: A class to handle extraction, processing, and saving of
     exchange data.
 Functions:
     downscale_exchange(exchange: list, mask_list: list) -> np.ndarray:
@@ -14,6 +14,7 @@ Functions:
 Author:
     Anders Bergman
 """
+
 import numpy as np
 from .rspt_extract import (
     extract_bravais_lattice_matrix,
@@ -24,74 +25,75 @@ from .rspt_extract import (
     transform_matrix,
     flatten_and_concatenate,
 )
+
 # import .rspt_extract as rs
 
 
 class RsptExchange:
     """
-        This class provides methods to extract exchange data from a specified file,
-        process the data, and save the processed data to an output file.
+    This class provides methods to extract exchange data from a specified file,
+    process the data, and save the processed data to an output file.
 
-        Attributes:
-            alat (float): Lattice constant.
-            lattice (np.ndarray): Bravais lattice matrix.
-            matrices (np.ndarray): Exchange matrices.
-            i_atom (np.ndarray): Atom indices.
-            r_i (np.ndarray): Position vectors of the i-th atom.
-            j_atoms (np.ndarray): Atom indices of neighboring atoms.
-            d_ij (np.ndarray): Distance vectors between atoms.
-            r_ij (np.ndarray): Distance vectors between atoms in reduced coordinates.
-            basis (np.ndarray): Basis vectors.
-            s_ij (np.ndarray): Maptype three representation of distance vectors.
-            outmap (np.ndarray): Processed data.
+    Attributes:
+        alat (float): Lattice constant.
+        lattice (np.ndarray): Bravais lattice matrix.
+        matrices (np.ndarray): Exchange matrices.
+        i_atom (np.ndarray): Atom indices.
+        r_i (np.ndarray): Position vectors of the i-th atom.
+        j_atoms (np.ndarray): Atom indices of neighboring atoms.
+        d_ij (np.ndarray): Distance vectors between atoms.
+        r_ij (np.ndarray): Distance vectors between atoms in reduced coordinates.
+        basis (np.ndarray): Basis vectors.
+        s_ij (np.ndarray): Maptype three representation of distance vectors.
+        outmap (np.ndarray): Processed data.
 
-        Methods:
-            __init__(file_path: str):
-                Initializes the RsptExchange object with the given file path.
-            
-            extract_data():
-                Extracts exchange data from the input file.
-            
-            process_data():
-                Processes the extracted data.
-            
-            save_output(output_path: str):
-                Saves the processed data to a specified output file.
+    Methods:
+        __init__(file_path: str):
+            Initializes the RsptExchange object with the given file path.
 
-        Example:
-            file_path = "spin-001/out-3"
-            output_path = "outmap.txt"
+        extract_data():
+            Extracts exchange data from the input file.
 
-            rspt_exchange = RsptExchange(file_path)
-            rspt_exchange.extract_data()
-            rspt_exchange.process_data()
-            rspt_exchange.save_output(output_path)
+        process_data():
+            Processes the extracted data.
 
-        Author:
-            Anders Bergman
+        save_output(output_path: str):
+            Saves the processed data to a specified output file.
+
+    Example:
+        file_path = "spin-001/out-3"
+        output_path = "outmap.txt"
+
+        rspt_exchange = RsptExchange(file_path)
+        rspt_exchange.extract_data()
+        rspt_exchange.process_data()
+        rspt_exchange.save_output(output_path)
+
+    Author:
+        Anders Bergman
     """
 
     def __init__(self, file_path):
         """
-            This constructor sets up the RsptExchange object by initializing its 
-            attributes and calling methods to extract and process data from the 
-            provided input file.
+        This constructor sets up the RsptExchange object by initializing its
+        attributes and calling methods to extract and process data from the
+        provided input file.
 
 
-            Attributes:
-                alat (float or None): Lattice parameter.
-                lattice (list or None): Lattice vectors.
-                matrices (list or None): Exchange matrices.
-                i_atom (int or None): Index of the atom.
-                r_i (list or None): Position vector of the atom.
-                j_atoms (list or None): Indices of neighboring atoms.
-                d_ij (list or None): Distance vectors between atoms.
-                r_ij (list or None): Relative position vectors.
-                basis (list or None): Basis vectors.
-                s_ij (list or None): Spin interaction parameters.
-                outmap (dict or None): Output mapping of processed data.
+        Attributes:
+            alat (float or None): Lattice parameter.
+            lattice (list or None): Lattice vectors.
+            matrices (list or None): Exchange matrices.
+            i_atom (int or None): Index of the atom.
+            r_i (list or None): Position vector of the atom.
+            j_atoms (list or None): Indices of neighboring atoms.
+            d_ij (list or None): Distance vectors between atoms.
+            r_ij (list or None): Relative position vectors.
+            basis (list or None): Basis vectors.
+            s_ij (list or None): Spin interaction parameters.
+            outmap (dict or None): Output mapping of processed data.
 
-            Author: Anders Bergman
+        Author: Anders Bergman
         """
         self.file_path = file_path
         self.alat = None
@@ -110,13 +112,13 @@ class RsptExchange:
 
     def extract_data(self):
         """
-        Extracts various data from the specified file and assigns it to instance 
+        Extracts various data from the specified file and assigns it to instance
         variables.
 
         This method performs the following operations:
         1. Extracts the Bravais lattice matrix and lattice constant.
         2. Extracts the exchange matrices.
-        3. Extracts distance vectors including atom indices, positions, and 
+        3. Extracts distance vectors including atom indices, positions, and
            distances.
         4. Extracts basis vectors.
         5. Converts the extracted data to a specific map type.
@@ -141,22 +143,26 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
-        self.alat, self.lattice = extract_bravais_lattice_matrix(
-            self.file_path)
+        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_path)
         self.matrices = extract_exchange_matrices(self.file_path)
-        self.i_atom, self.r_i, self.j_atoms, self.d_ij, self.r_ij = (
-            extract_distance_vectors(self.file_path))
+        (
+            self.i_atom,
+            self.r_i,
+            self.j_atoms,
+            self.d_ij,
+            self.r_ij,
+        ) = extract_distance_vectors(self.file_path)
         self.basis = extract_basis_vectors(self.file_path)
-        self.s_ij = convert_to_maptype_three(self.i_atom, self.j_atoms,
-                                             self.basis, self.lattice,
-                                             self.alat, self.r_ij)
+        self.s_ij = convert_to_maptype_three(
+            self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
+        )
 
     def process_data(self):
         """
         Processes the data to generate a flattened and concatenated output map.
 
-        This method iterates over the `r_ij` attribute, constructs a list of 
-        transformed and normalized data for each index, and appends the result 
+        This method iterates over the `r_ij` attribute, constructs a list of
+        transformed and normalized data for each index, and appends the result
         to the `outmap` attribute. The final `outmap` is stored as a NumPy array.
 
         Args:
@@ -207,8 +213,9 @@ class RsptExchange:
             Anders Bergman
         """
         fmt1 = "%4d %4d   % 4.1f % 4.1f % 4.1f   "
-        fmt2 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f     %8.4f"
-        fmt = fmt1 + fmt2
+        fmt2 = "% 10.6f % 10.6f % 10.6f  % 10.6f "
+        fmt3 = "% 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f     %8.4f"
+        fmt = fmt1 + fmt2 + fmt3
         np.savetxt(output_path, self.outmap, fmt=fmt)
 
 
@@ -250,13 +257,13 @@ def extract_projections(exchange):
     """
     Extracts various projections from the exchange matrix.
 
-    This function processes the exchange matrix to extract scalar, diagonal, 
-    tensor, Dzyaloshinskii-Moriya interaction (DMI), and symmetric components 
-    for each atom. It also separates the left and right parts of the exchange 
+    This function processes the exchange matrix to extract scalar, diagonal,
+    tensor, Dzyaloshinskii-Moriya interaction (DMI), and symmetric components
+    for each atom. It also separates the left and right parts of the exchange
     matrix.
 
     Args:
-        exchange (np.ndarray): A 2D numpy array representing the exchange 
+        exchange (np.ndarray): A 2D numpy array representing the exchange
             matrix. The shape of the array is (natom, nfeatures).
 
     Returns:
@@ -300,14 +307,14 @@ def print_projections(j_dict):
     """
     Save projections from a dictionary to files with specific formatting.
 
-    This function takes a dictionary containing projection data and saves the 
-    projections to files. Each type of projection is saved in a separate file 
+    This function takes a dictionary containing projection data and saves the
+    projections to files. Each type of projection is saved in a separate file
     with a specific format.
 
     Args:
-        j_dict (dict): A dictionary containing the projection data. The keys 
-        should include "left", "right", and one or more of the following: 
-        "scalar", "diagonal", "dmi", "symmetric", "tensor". Each key should 
+        j_dict (dict): A dictionary containing the projection data. The keys
+        should include "left", "right", and one or more of the following:
+        "scalar", "diagonal", "dmi", "symmetric", "tensor". Each key should
         map to a numpy array.
 
     Returns:
@@ -346,7 +353,6 @@ def print_projections(j_dict):
         fname = f"j_{key}.dat"
         np.savetxt(fname, outmat, fmt=fmt_l + fmts[idx] + fmt_r)
     print("Projections saved to files.")
-    return
 
 
 if __name__ == "__main__":

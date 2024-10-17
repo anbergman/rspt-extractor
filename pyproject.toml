@@ -24,7 +24,6 @@ classifiers = [
 "Documentation" = "https://example.com/docs"
 "Source Code" = "https://github.com/your-username/rspt"
 
-# Define scripts using the modern [project.scripts] format
+#Define scripts using the modern [project.scripts] format
 [project.scripts]
-rspt-runner = "rspt.rspt_runner:main"
-
+rspt-runner = "rspt_extractor.rspt_runner:main"
