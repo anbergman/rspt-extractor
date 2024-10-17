@@ -40,8 +40,15 @@ Attributes:
 
 """
 import numpy as np
-import rspt_scf
-import rspt_exchange as rspt_xc
+from rspt_extractor import (
+    RsptScf,
+    RsptExchange,
+    downscale_exchange,
+    extract_projections,
+    print_projections,
+)
+#import rspt_scf
+#import rspt_exchange as rspt_xc
 
 # List of input files
 input_directions = ["100", "010", "001"]
@@ -49,7 +56,7 @@ input_atoms = range(1, 5)
 
 input_files: list[str] = []
 
-exchange_data: dict[str, list[rspt_xc.RsptExchange]] = {}
+exchange_data: dict[str, list[RsptExchange]] = {}
 
 # Extract information from each input file
 for direction in input_directions:
@@ -58,7 +65,7 @@ for direction in input_directions:
     for atoms in input_atoms:
         print(f"Atom: {atoms}")
         file_name = f"spin-{direction}/out-{atoms}"
-        extracted_data = rspt_xc.RsptExchange(file_name)
+        extracted_data = RsptExchange(file_name)
         exchange_data[direction].append(extracted_data.outmap)
 
 concatenated_data: dict[str, np.ndarray] = {}
@@ -88,14 +95,15 @@ summed_data = (
     np.array(masked_data["001"] + masked_data["010"] + masked_data["100"]) /
     3.0)
 
-j_truncated = rspt_xc.downscale_exchange(summed_data, [1, 2, 3, 4])
-j_dict = rspt_xc.extract_projections(j_truncated)
-rspt_xc.print_projections(j_dict)
+j_truncated = downscale_exchange(summed_data, [1, 2, 3, 4])
+j_dict = extract_projections(j_truncated)
+print_projections(j_dict)
 
 # Exctract data from an scf-run
 scf_file = f"spin-{input_directions[-1]}/out-scf"
 print("Extracting SCF data from:", scf_file)
-scf_data = rspt_scf.RsptScf(scf_file)
+scf_data = RsptScf(scf_file)
+
 # Print the lattice file from any of the input files
 print("Lattice:")
 print(scf_data.lattice)
@@ -106,4 +114,5 @@ print(scf_data.moments)
 scf_data.print_lattice("lattice.dat")
 scf_data.print_positions("posfile")
 scf_data.print_moments("momfile")
+scf_data.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
 print("Extraction and storage completed successfully!")

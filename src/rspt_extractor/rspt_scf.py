@@ -5,8 +5,10 @@ The class provides methods for extracting exchange data from an input file,
 processing the extracted data, and saving the processed data to an output file.
 """
 
+import importlib.resources
 import numpy as np
-import rspt_extract as rs
+from .rspt_extract import extract_moments, extract_basis_vectors, extract_bravais_lattice_matrix
+#import rspt_extract as rs
 
 
 class RsptScf:
@@ -87,9 +89,10 @@ class RsptScf:
         Author:
             Anders Bergman
         """
-        self.alat, self.lattice = rs.extract_bravais_lattice_matrix(self.file_path)
-        self.basis = rs.extract_basis_vectors(self.file_path)
-        self.moments = rs.extract_moments(self.file_path)
+        self.alat, self.lattice = extract_bravais_lattice_matrix(
+            self.file_path)
+        self.basis = extract_basis_vectors(self.file_path)
+        self.moments = extract_moments(self.file_path)
 
     def print_lattice(self, output_path):
         """
@@ -135,9 +138,9 @@ class RsptScf:
         posdata = []
         for i, pos in enumerate(self.basis):
             posdata.append(np.hstack([i + 1, i + 1, pos]))
-        np.savetxt(
-            output_path, np.array(posdata), fmt="%4d %4d  % 10.6f % 10.6f % 10.6f"
-        )
+        np.savetxt(output_path,
+                   np.array(posdata),
+                   fmt="%4d %4d  % 10.6f % 10.6f % 10.6f")
 
     def print_moments(self, output_path):
         """
@@ -210,9 +213,13 @@ class RsptScf:
             "exchange": exchange,
         }
 
-        # Read the template from the external file
-        with open("inpsd.template", "r", encoding="utf-8") as file:
+        # Read the template from the package using importlib.resources
+        with importlib.resources.files("rspt").joinpath("inpsd.template").open(
+                "r", encoding="utf-8") as file:
             template = file.read()
+        # Read the template from the external file
+        #   with open("inpsd.template", "r", encoding="utf-8") as file:
+        #   template = file.read()
 
         # Use the template to create the final output string
         output = template.format(**template_values)
@@ -230,4 +237,5 @@ if __name__ == "__main__":
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")
     rspt_exchange.print_moments("momfile")
-    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat",
+                                 "inpsd.minimal")

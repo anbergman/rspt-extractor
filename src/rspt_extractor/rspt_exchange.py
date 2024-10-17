@@ -15,7 +15,16 @@ Author:
     Anders Bergman
 """
 import numpy as np
-import rspt_extract as rs
+from .rspt_extract import (
+    extract_bravais_lattice_matrix,
+    extract_exchange_matrices,
+    extract_distance_vectors,
+    extract_basis_vectors,
+    convert_to_maptype_three,
+    transform_matrix,
+    flatten_and_concatenate,
+)
+# import .rspt_extract as rs
 
 
 class RsptExchange:
@@ -132,15 +141,15 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
-        self.alat, self.lattice = rs.extract_bravais_lattice_matrix(self.file_path)
-        self.matrices = rs.extract_exchange_matrices(self.file_path)
+        self.alat, self.lattice = extract_bravais_lattice_matrix(
+            self.file_path)
+        self.matrices = extract_exchange_matrices(self.file_path)
         self.i_atom, self.r_i, self.j_atoms, self.d_ij, self.r_ij = (
-            rs.extract_distance_vectors(self.file_path)
-        )
-        self.basis = rs.extract_basis_vectors(self.file_path)
-        self.s_ij = rs.convert_to_maptype_three(
-            self.i_atom, self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
-        )
+            extract_distance_vectors(self.file_path))
+        self.basis = extract_basis_vectors(self.file_path)
+        self.s_ij = convert_to_maptype_three(self.i_atom, self.j_atoms,
+                                             self.basis, self.lattice,
+                                             self.alat, self.r_ij)
 
     def process_data(self):
         """
@@ -171,10 +180,10 @@ class RsptExchange:
                 self.i_atom,
                 self.j_atoms[idx],
                 self.s_ij[idx],
-                rs.transform_matrix(self.matrices[idx]).flatten(),
+                transform_matrix(self.matrices[idx]).flatten(),
                 self.d_ij[idx] / self.alat,
             ]
-            outmap.append(rs.flatten_and_concatenate(i_list))
+            outmap.append(flatten_and_concatenate(i_list))
         self.outmap = np.array(outmap)
 
     def save_output(self, output_path):
@@ -201,6 +210,7 @@ class RsptExchange:
         fmt2 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f     %8.4f"
         fmt = fmt1 + fmt2
         np.savetxt(output_path, self.outmap, fmt=fmt)
+
 
 def downscale_exchange(exchange, mask_list):
     """
