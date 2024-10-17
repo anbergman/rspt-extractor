@@ -24,6 +24,7 @@ Functions:
     convert_to_maptype_three(j_atoms: list, basis: np.ndarray, lattice: np.ndarray,
                              alat: float, r_ij: np.ndarray) -> np.ndarray:
 """
+
 import numpy as np
 
 

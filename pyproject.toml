@@ -28,4 +28,4 @@ dependencies = [
 "Source Code" = "https://github.com/your-username/rspt"
 
 [project.scripts]
-rspt-runner = "rspt_extractor.rspt_runner:main"
+rspt-parser = "rspt_extractor.rspt_runner:main"

@@ -40,6 +40,7 @@ Attributes:
 
 """
 
+import argparse
 import numpy as np
 from rspt_extractor import (
     RsptScf,
@@ -50,7 +51,7 @@ from rspt_extractor import (
 )
 
 
-def main():
+def default_workflow(xstr="100", ystr="010", zstr="001"):
     """
     Main function to extract and process exchange data from RSPT output files.
 
@@ -79,11 +80,9 @@ def main():
     Author:
         Anders Bergman
     """
-    # List of input files
-    input_directions = ["100", "010", "001"]
+    # Define input directions and atoms
+    input_directions = [xstr, ystr, zstr]
     input_atoms = range(1, 5)
-
-    # input_files: list[str] = []
 
     exchange_data: dict[str, list[RsptExchange]] = {}
 
@@ -98,24 +97,20 @@ def main():
             exchange_data[direction].append(extracted_data.outmap)
 
     concatenated_data: dict[str, np.ndarray] = {}
-    # concatenated_data = {}
     for key, value in exchange_data.items():
         print(key, len(value))
         concatenated_data[key] = np.concatenate([v for v in value])
 
+    # Masks for extracting the "best" estimates for J, D, A
+    # Example: spin-axis x gives Dx and Ax but J as 0.5*(Jyy*Jzz)
     x_mask = np.array([[0.0, 0.0, 0.0], [0.0, 0.5, 1.0], [0.0, 1.0, 0.5]])
     y_mask = np.array([[0.5, 0.0, 1.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.5]])
     z_mask = np.array([[0.5, 1.0, 0.0], [1.0, 0.5, 0.0], [0.0, 0.0, 0.0]])
     mask_list = [x_mask, y_mask, z_mask]
 
-    # masked_data = {key: value.copy() for key, value in concatenated_data.items()}
     masked_data: dict[str, np.ndarray] = {
         key: value.copy() for key, value in concatenated_data.items()
     }
-    # masked_data = {
-    #     key: [rspt_xc.RsptExchange(v) for v in value]
-    #     for key, value in exchange_data.items()
-    # }
 
     for idx, (key, value) in enumerate(masked_data.items()):
         for row in value:
@@ -148,6 +143,127 @@ def main():
     scf_data.print_moments("momfile")
     scf_data.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
     print("Extraction and storage completed successfully!")
+
+
+def run_scf(filepath):
+    """
+    Run the SCF (Self-Consistent Field) calculation using the given file path.
+
+    This function initializes an RsptScf object with the provided file path and
+    generates several output files related to the lattice, atomic positions,
+    magnetic moments, and a template for further calculations.
+
+    Args:
+        filepath (str): The path to the input file required for the SCF
+                        calculation.
+
+    Outputs:
+        lattice.dat: File containing lattice information.
+        posfile: File containing atomic positions.
+        momfile: File containing magnetic moments.
+        inpsd.minimal: Template file for further calculations.
+
+    Author:
+        Anders Bergman
+    """
+    rspt_exchange = RsptScf(filepath)
+    rspt_exchange.print_lattice("lattice.dat")
+    rspt_exchange.print_positions("posfile")
+    rspt_exchange.print_moments("momfile")
+    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+
+
+def run_exchange(filepath):
+    """
+    Executes the RSPT exchange process and saves the output to a file.
+
+    This function initializes an RsptExchange object with the provided
+    filepath, runs the exchange process, and saves the output to a file
+    named 'jfile.tensor'.
+
+    Args:
+        filepath (str): The path to the input file for the RSPT exchange
+        process.
+
+    Returns:
+        None
+
+    Author:
+        Anders Bergman
+    """
+    rspt_exchange = RsptExchange(filepath)
+    rspt_exchange.save_output("jfile.tensor")
+
+
+def main():
+    """
+    Main function to parse command-line arguments and run the appropriate
+    workflow based on the provided options.
+
+    This function sets up a command-line interface (CLI) with three options:
+    - `-s` or `--scf`: Run the SCF workflow with the given file path.
+    - `-e` or `--exchange`: Run the exchange workflow with the given file path.
+    - `-r` or `--run`: Run the default workflow with the given directories.
+
+    The function then parses the arguments and calls the corresponding
+    workflow function based on the provided options.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If the argument parsing fails or if an invalid combination
+        of arguments is provided.
+
+    Example:
+        To run the SCF workflow:
+            $ python rspt_runner.py -s /path/to/scf_file
+
+        To run the exchange workflow:
+            $ python rspt_runner.py -e /path/to/exchange_file
+
+        To run the default workflow:
+            $ python rspt_runner.py -r dirx diry dirz
+
+    Author:
+        Anders Bergman
+    """
+    parser = argparse.ArgumentParser(description="RSPt data extraction tool")
+
+    # CLI options
+    parser.add_argument(
+        "-s", "--scf", type=str, help="Run SCF workflow with the given FILE_PATH"
+    )
+    parser.add_argument(
+        "-e",
+        "--exchange",
+        type=str,
+        help="Run exchange workflow with the given FILE_PATH",
+    )
+    parser.add_argument(
+        "-r",
+        "--run",
+        nargs=3,
+        metavar=("DIRX", "DIRY", "DIRZ"),
+        help="Run default workflow with directories",
+    )
+
+    # Parse the arguments
+    args = parser.parse_args()
+
+    print(args.run)
+    # Decide which function to run based on the CLI arguments
+    if args.scf:
+        run_scf(args.scf)
+    elif args.exchange:
+        run_exchange(args.exchange)
+    elif args.run:
+        default_workflow(args.run[0], args.run[1], args.run[2])
+    else:
+        default_workflow()
 
 
 if __name__ == "__main__":
