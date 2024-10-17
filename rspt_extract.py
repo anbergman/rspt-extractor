@@ -74,11 +74,13 @@ def extract_bravais_lattice_matrix(file_path):
     Returns:
         tuple: A tuple containing the lattice constant and the lattice matrix.
     """
+    print("Extracting bravais lattice matrix from:", file_path)
     with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     matrix = []
     capture = False
+    alat = 0.0
 
     for line in lines:
         if "Bravais lattice basis" in line:
@@ -95,6 +97,41 @@ def extract_bravais_lattice_matrix(file_path):
                 break
 
     return alat, np.array(matrix)
+
+
+def extract_moments(file_path):
+    """
+    Extracts magnetic moments from a file.
+
+    Parameters:
+    file_path (str): The path to the file containing the basis vectors.
+
+    Returns:
+    numpy.ndarray: An array of magnetic moments
+
+    """
+    with open(file_path, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+
+    moments = []
+    capture = False
+    captured = False
+
+    for line in lines:
+        if "type           spin     orbital       total" in line:
+            capture = True
+            continue
+
+        if capture and not captured:
+            # Check if the line has three floating point numbers
+            values = line.split()
+            if values[0] == "total":
+                captured = True
+                capture = False
+                continue
+            moments.append([float(val) for val in values[1:4]])
+
+    return np.array(moments, dtype=np.float32)
 
 
 def extract_basis_vectors(file_path):
@@ -148,7 +185,9 @@ def extract_distance_vectors(file_path):
 
     r_ij = []
     d_ij = []
+    i_atom = 0
     j_atom = []
+    r_ij = []
     capture_glob = False
 
     for line in lines:
@@ -229,12 +268,13 @@ def convert_to_maptype_three(i_atom, j_atoms, basis, lattice, alat, r_ij):
 
     """
     invlatt = np.linalg.inv(lattice)
+    basis[:, 2] = -basis[:, 2]
     s_ij = []
     for idx, vector in enumerate(r_ij):
         r_i = np.dot(lattice, basis[i_atom - 1])
         r_j = np.dot(lattice, basis[j_atoms[idx] - 1])
         r_shift = vector / alat
-        v_ij = r_shift - r_j - r_i
+        v_ij = r_shift - r_j  # - r_i
         s_ij.append(np.dot(invlatt, v_ij))
 
     return np.array(s_ij, dtype=np.float32).round(4)

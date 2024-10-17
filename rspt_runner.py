@@ -1,70 +1,71 @@
+"""
+Module for extracting and processing exchange data from RSPt calculations.
+
+This module reads exchange data from multiple input files, processes the data
+by applying masks, and then combines the data. It also extracts and prints
+information from an SCF run.
+
+Author: Anders Bergman
+
+Functions:
+    main(): Main function to execute the data extraction and processing.
+
+Usage:
+    This script is intended to be run as a standalone module.
+
+Example:
+    $ python rspt_runner.py
+
+Dependencies:
+    - numpy
+    - rspt_scf
+    - rspt_exchange (as rspt_xc)
+
+Attributes:
+    input_directions (list): List of input directions.
+    input_atoms (range): Range of input atoms.
+    input_files (list): List to store input files.
+    exchange_data (dict): Dictionary to store extracted exchange data.
+    concatenated_data (dict): Dictionary to store concatenated exchange data.
+    x_mask (np.array): Mask for x direction.
+    y_mask (np.array): Mask for y direction.
+    z_mask (np.array): Mask for z direction.
+    mask_list (list): List of masks for each direction.
+    masked_data (dict): Dictionary to store masked exchange data.
+    summed_data (np.array): Array to store summed exchange data.
+    j_truncated (np.array): Array to store downscaled exchange data.
+    j_dict (dict): Dictionary to store extracted projections.
+    scf_file (str): File path for SCF data.
+    scf_data (RsptScf): Object to store SCF data.
+
+"""
 import numpy as np
-import rspt_exchange as rspt
-
-
-# def extract_projections(exchange):
-#     natom = exchange.shape[0]
-#     j_dict = {}
-#     j_dict["scalar"] = np.zeros((natom, 1))
-#     j_dict["diagonal"] = np.zeros((natom, 9))
-#     j_dict["tensor"] = np.zeros((natom, 9))
-#     j_dict["dmi"] = np.zeros((natom, 3))
-#     j_dict["symmetric"] = np.zeros((natom, 3))
-#     for irow, row in enumerate(exchange):
-#         j_mat = row[5:14].reshape(3, 3)
-#         j_mat_sym = 0.5 * (j_mat - j_mat.T)
-#         j_mat_asym = 0.5 * (j_mat - j_mat.T)
-#         dmi = np.array([j_mat_asym[1, 2], j_mat_asym[2, 0], j_mat_asym[0, 1]])
-#         jsy = np.array([j_mat_sym[1, 2], j_mat_sym[2, 0], j_mat_sym[0, 1]])
-#         j_dict["scalar"][irow] = np.trace(j_mat) / 3.0
-#         j_dict["diagonal"][irow] = np.diag(np.diag(j_mat)).flatten()
-#         j_dict["dmi"][irow] = dmi
-#         j_dict["symmetric"][irow] = jsy
-#         j_dict["tensor"][irow] = j_mat.flatten()
-# 
-#     j_dict["left"] = exchange[:, 0:5]
-#     j_dict["right"] = exchange[:, 14:]
-#     
-#     return j_dict
-# 
-# def print_projections(j_dict):
-# 
-#     fmt_l = "%4d %4d   % 4.1f % 4.1f % 4.1f    "
-#     fmt_1 = "% 10.6f"
-#     fmt_3 = "% 10.6f % 10.6f % 10.6f"
-#     fmt_9 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f"
-#     fmt_r = "     %8.4f"
-#     
-#     keys = ["scalar", "diagonal", "dmi", "symmetric", "tensor"]
-#     fmts = [fmt_1, fmt_9, fmt_3, fmt_3, fmt_9]
-#     
-#     for idx, key in enumerate(keys):
-#         outmat = np.hstack((j_dict["left"], j_dict[key], j_dict["right"]))
-#         fname = f"j_{key}.dat"
-#         np.savetxt(fname, outmat, fmt=fmt_l + fmts[idx] + fmt_r)
-#     print("Projections saved to files.")
-#     return
-
+import rspt_scf
+import rspt_exchange as rspt_xc
 
 # List of input files
 input_directions = ["100", "010", "001"]
-input_atoms = ["1", "2", "3", "4"]
+input_atoms = range(1, 5)
 
-input_files = []
+input_files: list[str] = []
 
-exchange_data = {}
+exchange_data: dict[str, list[rspt_xc.RsptExchange]] = {}
 
 # Extract information from each input file
 for direction in input_directions:
+    print("Extracting exchange data from:", direction)
     exchange_data[direction] = []
     for atoms in input_atoms:
+        print(f"Atom: {atoms}")
         file_name = f"spin-{direction}/out-{atoms}"
-        extracted_data = rspt.RsptExchange(file_name)
+        extracted_data = rspt_xc.RsptExchange(file_name)
         exchange_data[direction].append(extracted_data.outmap)
 
-concatenated_data = {}
+concatenated_data: dict[str, np.ndarray] = {}
+#concatenated_data = {}
 for key, value in exchange_data.items():
-    concatenated_data[key] = np.concatenate(value)
+    print(key, len(value))
+    concatenated_data[key] = np.concatenate([v for v in value])
 
 x_mask = np.array([[0.0, 0.0, 0.0], [0.0, 0.5, 1.0], [0.0, 1.0, 0.5]])
 y_mask = np.array([[0.5, 0.0, 1.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.5]])
@@ -72,6 +73,10 @@ z_mask = np.array([[0.5, 1.0, 0.0], [1.0, 0.5, 0.0], [0.0, 0.0, 0.0]])
 mask_list = [x_mask, y_mask, z_mask]
 
 masked_data = {key: value.copy() for key, value in concatenated_data.items()}
+# masked_data = {
+#     key: [rspt_xc.RsptExchange(v) for v in value]
+#     for key, value in exchange_data.items()
+# }
 
 for idx, (key, value) in enumerate(masked_data.items()):
     for row in value:
@@ -79,16 +84,26 @@ for idx, (key, value) in enumerate(masked_data.items()):
         j_mat = mask_list[idx] * j_mat * 3.0
         row[5:14] = j_mat.flatten()
 
-
 summed_data = (
-    np.array(masked_data["001"] + masked_data["010"] + masked_data["100"]) / 3.0
-)
+    np.array(masked_data["001"] + masked_data["010"] + masked_data["100"]) /
+    3.0)
 
-# fmt1 = "%4d %4d   % 4.1f % 4.1f % 4.1f   "
-# fmt2 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f     %8.4f"
-# fmt = fmt1 + fmt2
-# np.savetxt("jtot.txt", summed_data, fmt=fmt)
+j_truncated = rspt_xc.downscale_exchange(summed_data, [1, 2, 3, 4])
+j_dict = rspt_xc.extract_projections(j_truncated)
+rspt_xc.print_projections(j_dict)
 
-j_dict = rspt.extract_projections(summed_data)
-rspt.print_projections(j_dict)
+# Exctract data from an scf-run
+scf_file = f"spin-{input_directions[-1]}/out-scf"
+print("Extracting SCF data from:", scf_file)
+scf_data = rspt_scf.RsptScf(scf_file)
+# Print the lattice file from any of the input files
+print("Lattice:")
+print(scf_data.lattice)
+print("Basis:")
+print(scf_data.basis)
+print("Moments:")
+print(scf_data.moments)
+scf_data.print_lattice("lattice.dat")
+scf_data.print_positions("posfile")
+scf_data.print_moments("momfile")
 print("Extraction and storage completed successfully!")
