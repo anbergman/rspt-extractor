@@ -243,7 +243,7 @@ def main():
     Author:
         Anders Bergman
     """
-    parser = argparse.ArgumentParser(description="RSPt data extraction tool")
+    parser = argparse.ArgumentParser(description="RSPt exchange extraction tool")
 
     # CLI options
     parser.add_argument(

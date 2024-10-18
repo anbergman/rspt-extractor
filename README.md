@@ -32,3 +32,23 @@ rspt-runner
 ```
 
 This should work for the included examples.
+
+## Options
+
+While the package can be customized to your own needs, the default script `rspt-runner` comes with a number of flags to allow more user control. The flags are visible by `rspt-runner --help` and are currently as follows
+
+```syntax
+RSPt exchange extraction tool
+
+options:
+  -h, --help            show this help message and exit
+  -s SCF_PATH, --scf SCF_PATH     Run SCF workflow with the given SCF_PATH
+  -e XC_PATH, --exchange XC_PATH
+                        Run exchange workflow with the given XC_PATH
+  -r DIRX DIRY DIRZ, --run DIRX DIRY DIRZ
+                        Run default workflow with directories DIRX DIRY DIRZ
+  -m MAPTYPE, --maptype MAPTYPE
+                        Output maptype: (C)artesian, (D)irect or maptype (3)
+  -a ATOMS [ATOMS ...], --atoms ATOMS [ATOMS ...]
+                        List of atoms to extract exchange interactions for. Default all.
+```
