@@ -22,6 +22,7 @@ from .rspt_extract import (
     extract_distance_vectors,
     extract_basis_vectors,
     convert_to_maptype_three,
+    convert_to_direct,
     transform_matrix,
     flatten_and_concatenate,
 )
@@ -51,10 +52,10 @@ class RsptExchange:
         __init__(file_path: str):
             Initializes the RsptExchange object with the given file path.
 
-        extract_data():
+        extract_xc_data():
             Extracts exchange data from the input file.
 
-        process_data():
+        process_xc_data():
             Processes the extracted data.
 
         save_output(output_path: str):
@@ -65,15 +66,15 @@ class RsptExchange:
         output_path = "outmap.txt"
 
         rspt_exchange = RsptExchange(file_path)
-        rspt_exchange.extract_data()
-        rspt_exchange.process_data()
+        rspt_exchange.extract_xc_data()
+        rspt_exchange.process_xc_data()
         rspt_exchange.save_output(output_path)
 
     Author:
         Anders Bergman
     """
 
-    def __init__(self, file_path):
+    def __init__(self, file_path, maptype="C"):
         """
         This constructor sets up the RsptExchange object by initializing its
         attributes and calling methods to extract and process data from the
@@ -95,6 +96,7 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
+        print("Running exchange workflow with file:", file_path, "maptype:", maptype)
         self.file_path = file_path
         self.alat = None
         self.lattice = None
@@ -107,10 +109,10 @@ class RsptExchange:
         self.basis = None
         self.s_ij = None
         self.outmap = None
-        self.extract_data()
-        self.process_data()
+        self.extract_xc_data(maptype)
+        self.process_xc_data()
 
-    def extract_data(self):
+    def extract_xc_data(self, maptype="C"):
         """
         Extracts various data from the specified file and assigns it to instance
         variables.
@@ -143,8 +145,11 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
+        # Extracts the Bravais lattice matrix and lattice constant
         self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_path)
+        # Extracts the exchange matrices (J, D, A)
         self.matrices = extract_exchange_matrices(self.file_path)
+        # Extract bond info. r_i, r_ij in cartesian coordinates, d_ij = |r_ij|
         (
             self.i_atom,
             self.r_i,
@@ -152,12 +157,23 @@ class RsptExchange:
             self.d_ij,
             self.r_ij,
         ) = extract_distance_vectors(self.file_path)
+        # Extract basis vectors
         self.basis = extract_basis_vectors(self.file_path)
-        self.s_ij = convert_to_maptype_three(
-            self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
-        )
+        # Convert to map type
+        if maptype == "3" or maptype == "2":
+            self.s_ij = convert_to_maptype_three(
+                self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
+            )
+        elif maptype == "D":
+            self.s_ij = convert_to_direct(
+                self.basis, self.lattice, self.alat, self.r_ij
+            )
+        elif maptype == "C":
+            self.s_ij = self.r_ij / self.alat
+        else:
+            raise ValueError("Invalid maptype specified.")
 
-    def process_data(self):
+    def process_xc_data(self):
         """
         Processes the data to generate a flattened and concatenated output map.
 
@@ -219,7 +235,7 @@ class RsptExchange:
         np.savetxt(output_path, self.outmap, fmt=fmt)
 
 
-def downscale_exchange(exchange, mask_list):
+def downscale_exchange(exchange, mask_list=None):
     """
     Downscale the exchange matrix based on the provided mask list.
 
@@ -242,15 +258,18 @@ def downscale_exchange(exchange, mask_list):
     Author:
         Anders Bergman
     """
-    masked_data = []
-    for row in exchange:
-        if row[0] in mask_list and row[1] in mask_list:
-            new_row = row.copy()
-            new_row[0] = mask_list.index(row[0]) + 1
-            new_row[1] = mask_list.index(row[1]) + 1
-            masked_data.append(new_row)
+    if not mask_list:
+        return np.array(exchange, dtype=np.float32)
+    else:
+        masked_data = []
+        for row in exchange:
+            if row[0] in mask_list and row[1] in mask_list:
+                new_row = row.copy()
+                new_row[0] = mask_list.index(row[0]) + 1
+                new_row[1] = mask_list.index(row[1]) + 1
+                masked_data.append(new_row)
 
-    return np.array(masked_data, dtype=np.float32)
+        return np.array(masked_data, dtype=np.float32)
 
 
 def extract_projections(exchange):
@@ -303,7 +322,7 @@ def extract_projections(exchange):
     return j_dict
 
 
-def print_projections(j_dict):
+def print_projections(j_dict, maptype="C"):
     """
     Save projections from a dictionary to files with specific formatting.
 
@@ -339,7 +358,10 @@ def print_projections(j_dict):
     Author:
         Anders Bergman
     """
-    fmt_l = "%4d %4d   % 4.1f % 4.1f % 4.1f    "
+    if maptype == "C" or maptype == "D":
+        fmt_l = "%4d %4d   % 12.8f % 12.8f % 12.8f   "
+    else:
+        fmt_l = "%4d %4d   % 4.1f % 4.1f % 4.1f    "
     fmt_1 = "% 10.6f"
     fmt_3 = "% 10.6f % 10.6f % 10.6f"
     fmt_9 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f"

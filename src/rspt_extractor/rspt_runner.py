@@ -51,7 +51,8 @@ from rspt_extractor import (
 )
 
 
-def default_workflow(xstr="100", ystr="010", zstr="001"):
+# def default_workflow(xstr="100", ystr="010", zstr="001"):
+def default_workflow(input_directions=None, maptype="C", atomlist=None):
     """
     Main function to extract and process exchange data from RSPT output files.
 
@@ -81,7 +82,8 @@ def default_workflow(xstr="100", ystr="010", zstr="001"):
         Anders Bergman
     """
     # Define input directions and atoms
-    input_directions = [xstr, ystr, zstr]
+    if input_directions is None:
+        input_directions = ["100", "010", "001"]
     input_atoms = range(1, 5)
 
     exchange_data: dict[str, list[RsptExchange]] = {}
@@ -91,18 +93,18 @@ def default_workflow(xstr="100", ystr="010", zstr="001"):
         print("Extracting exchange data from:", direction)
         exchange_data[direction] = []
         for atoms in input_atoms:
-            print(f"Atom: {atoms}")
+            # print(f"Atom: {atoms}")
             file_name = f"spin-{direction}/out-{atoms}"
-            extracted_data = RsptExchange(file_name)
+            extracted_data = RsptExchange(file_name, maptype)
             exchange_data[direction].append(extracted_data.outmap)
 
     concatenated_data: dict[str, np.ndarray] = {}
     for key, value in exchange_data.items():
-        print(key, len(value))
         concatenated_data[key] = np.concatenate([v for v in value])
 
     # Masks for extracting the "best" estimates for J, D, A
     # Example: spin-axis x gives Dx and Ax but J as 0.5*(Jyy*Jzz)
+    # This should not be system dependent.
     x_mask = np.array([[0.0, 0.0, 0.0], [0.0, 0.5, 1.0], [0.0, 1.0, 0.5]])
     y_mask = np.array([[0.5, 0.0, 1.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.5]])
     z_mask = np.array([[0.5, 1.0, 0.0], [1.0, 0.5, 0.0], [0.0, 0.0, 0.0]])
@@ -122,9 +124,19 @@ def default_workflow(xstr="100", ystr="010", zstr="001"):
         np.array(masked_data["001"] + masked_data["010"] + masked_data["100"]) / 3.0
     )
 
-    j_truncated = downscale_exchange(summed_data, [1, 2, 3, 4])
+    # Filter out the Jij values so that only selected atoms are included
+    # eg. only the magnetic atoms
+    # j_truncated = downscale_exchange(summed_data, [1, 2])
+    print("Atomlist:", atomlist)
+    if atomlist is None:
+        j_truncated = np.array(summed_data, dtype=np.float32)
+    else:
+        j_truncated = downscale_exchange(summed_data, atomlist)
+
+    # Create the various projections you can make from the exchange interactions
     j_dict = extract_projections(j_truncated)
-    print_projections(j_dict)
+    # Print all projections to file
+    print_projections(j_dict, maptype)
 
     # Exctract data from an scf-run
     scf_file = f"spin-{input_directions[-1]}/out-scf"
@@ -173,7 +185,7 @@ def run_scf(filepath):
     rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
 
 
-def run_exchange(filepath):
+def run_exchange(filepath, maptype="C"):
     """
     Executes the RSPT exchange process and saves the output to a file.
 
@@ -191,7 +203,7 @@ def run_exchange(filepath):
     Author:
         Anders Bergman
     """
-    rspt_exchange = RsptExchange(filepath)
+    rspt_exchange = RsptExchange(filepath, maptype)
     rspt_exchange.save_output("jfile.tensor")
 
 
@@ -250,20 +262,37 @@ def main():
         metavar=("DIRX", "DIRY", "DIRZ"),
         help="Run default workflow with directories",
     )
+    parser.add_argument(
+        "-m",
+        "--maptype",
+        type=str,
+        help="Output maptype: (C)artesian, (D)irect or maptype (3)",
+    )
+    parser.add_argument(
+        "-a",
+        "--atoms",
+        nargs="+",
+        type=int,
+        help="List of atoms to extract exchange interactions for",
+    )
 
     # Parse the arguments
     args = parser.parse_args()
 
-    print(args.run)
     # Decide which function to run based on the CLI arguments
     if args.scf:
         run_scf(args.scf)
     elif args.exchange:
-        run_exchange(args.exchange)
+        run_exchange(args.exchange, args.maptype)
     elif args.run:
-        default_workflow(args.run[0], args.run[1], args.run[2])
+        default_workflow(
+            input_directions=args.run, maptype=args.maptype, atomlist=args.atoms
+        )
+        # default_workflow(args.run[0], args.run[1], args.run[2])
     else:
-        default_workflow()
+        default_workflow(
+            input_directions=None, maptype=args.maptype, atomlist=args.atoms
+        )
 
 
 if __name__ == "__main__":

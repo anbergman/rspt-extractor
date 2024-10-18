@@ -265,6 +265,10 @@ def extract_distance_vectors(file_path):
             - d_ij (list): A list of distances.
             - r_ij (list): A list of coordinates.
 
+    Note:
+        The distance vectors r_ij, and the coordinates r_i are in the global
+        cartesian coordinate system, scaled by the lattice constant.
+
     """
     with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
@@ -386,5 +390,36 @@ def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
         r_shift = vector / alat
         v_ij = r_shift - r_j  # - r_i
         s_ij.append(np.dot(invlatt, v_ij))
+
+    return np.array(s_ij, dtype=np.float32).round(4)
+
+
+def convert_to_direct(basis, lattice, alat, r_ij):
+    """
+    Converts cartesian atomic positions direct coordinates
+
+    This function takes in atomic positions and lattice parameters to compute
+    the mapped positions in a new coordinate system.
+
+    Args:
+        j_atoms (list[int]): List of atom indices.
+        basis (np.ndarray): Basis vectors of the atomic positions.
+        lattice (np.ndarray): Lattice vectors of the crystal.
+        alat (float): Lattice constant.
+        r_ij (np.ndarray): Relative positions between atoms.
+
+    Returns:
+        np.ndarray: Transformed atomic positions in the new coordinate system,
+        rounded to 4 decimal places.
+
+    Author:
+        Anders Bergman
+    """
+    invlatt = np.linalg.inv(lattice)
+    basis[:, 2] = -basis[:, 2]
+    s_ij = []
+    for vector in r_ij:
+        r_shift = vector / alat
+        s_ij.append(np.dot(invlatt, r_shift))
 
     return np.array(s_ij, dtype=np.float32).round(4)

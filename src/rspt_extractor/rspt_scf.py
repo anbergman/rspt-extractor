@@ -29,7 +29,7 @@ class RsptScf:
         moments (np.ndarray): Magnetic moments.
 
     Methods:
-        extract_data():
+        extract_scf_data():
         print_lattice(output_path):
             Print the lattice matrix to a text file.
         print_positions(output_path):
@@ -56,7 +56,7 @@ class RsptScf:
             moments (list or None): The magnetic moments, initialized as None.
 
         Methods:
-            extract_data(): Extracts data from the file and populates the
+            extract_scf_data(): Extracts data from the file and populates the
                             attributes.
 
         Author: Anders Bergman
@@ -66,9 +66,9 @@ class RsptScf:
         self.lattice = None
         self.basis = None
         self.moments = None
-        self.extract_data()
+        self.extract_scf_data()
 
-    def extract_data(self):
+    def extract_scf_data(self):
         """
         Extracts and sets the lattice matrix, basis vectors, and moments from
         the specified file.
