@@ -306,7 +306,7 @@ def extract_projections(exchange):
     j_dict["symmetric"] = np.zeros((natom, 3))
     for irow, row in enumerate(exchange):
         j_mat = row[5:14].reshape(3, 3)
-        j_mat_sym = 0.5 * (j_mat - j_mat.T)
+        j_mat_sym = 0.5 * (j_mat + j_mat.T)
         j_mat_asym = 0.5 * (j_mat - j_mat.T)
         dmi = np.array([j_mat_asym[1, 2], j_mat_asym[2, 0], j_mat_asym[0, 1]])
         jsy = np.array([j_mat_sym[1, 2], j_mat_sym[2, 0], j_mat_sym[0, 1]])
