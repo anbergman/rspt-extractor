@@ -235,7 +235,6 @@ class RsptScf:
 if __name__ == "__main__":
     # Example usage
     FILE_PATH = "spin-001/out-scf"
-
     rspt_exchange = RsptScf(FILE_PATH)
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")

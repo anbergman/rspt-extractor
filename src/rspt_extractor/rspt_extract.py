@@ -25,6 +25,7 @@ Functions:
                              alat: float, r_ij: np.ndarray) -> np.ndarray:
 """
 
+import re
 import numpy as np
 
 
@@ -140,7 +141,7 @@ def extract_bravais_lattice_matrix(file_path):
     Author:
         Anders Bergman
     """
-    print("Extracting bravais lattice matrix from:", file_path)
+    # print("Extracting bravais lattice matrix from:", file_path)
     with open(file_path, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
@@ -158,6 +159,7 @@ def extract_bravais_lattice_matrix(file_path):
             values = line.split()
             if len(values) == 3:
                 matrix.append([float(val) for val in values])
+
             # Stop capturing after reading three lines
             if len(matrix) == 3:
                 break
@@ -237,14 +239,25 @@ def extract_basis_vectors(file_path):
     vectors = []
     capture = False
 
+    # Define a regular expression to match floats (including scientific notation)
+    float_pattern = r"([+-]?\d+\.\d+E[+-]?\d+)"
+
     for line in lines:
         if "G*t/2pi" in line:
             capture = True
             continue  # Skip the line containing 'Bravais lattice basis'
         if capture:
             # Check if the line has three floating point numbers
-            values = line.split()
-            vectors.append([float(val) for val in values[0:3]])
+            # values = line.split()
+
+            # Use re.findall to extract all the float numbers from the string
+            parsed_data = re.findall(float_pattern, line)
+
+            # Convert strings to float (optional)
+            parsed_data = [float(num) for num in parsed_data]
+
+            vectors.append([float(val) for val in parsed_data])
+            # vectors.append([float(val) for val in values[0:3]])
             capture = False
 
     return np.array(vectors, dtype=np.float32)

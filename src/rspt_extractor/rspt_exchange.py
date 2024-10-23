@@ -96,7 +96,7 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
-        print("Running exchange workflow with file:", file_path, "maptype:", maptype)
+        # print("Running exchange workflow with file:", file_path, "maptype:", maptype)
         self.file_path = file_path
         self.alat = None
         self.lattice = None
@@ -379,7 +379,7 @@ def print_projections(j_dict, maptype="C"):
 
 if __name__ == "__main__":
     # Example usage
-    FILE_PATH = "spin-001/out-3"
+    FILE_PATH = "spin-001/out-1"
     OUTPUT_PATH = "outmap.txt"
 
     rspt_exchange = RsptExchange(FILE_PATH)

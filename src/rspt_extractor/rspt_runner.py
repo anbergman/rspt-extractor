@@ -40,6 +40,7 @@ Attributes:
 
 """
 
+import glob
 import argparse
 import numpy as np
 from rspt_extractor import (
@@ -52,7 +53,7 @@ from rspt_extractor import (
 
 
 # def default_workflow(xstr="100", ystr="010", zstr="001"):
-def default_workflow(input_directions=None, maptype="C", atomlist=None):
+def default_workflow(input_directions=None, maptype="C", atomlist=None, prefix="spin-"):
     """
     Main function to extract and process exchange data from RSPT output files.
 
@@ -81,20 +82,36 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None):
     Author:
         Anders Bergman
     """
+    print("-" * 50)
     # Define input directions and atoms
     if input_directions is None:
         input_directions = ["100", "010", "001"]
-    input_atoms = range(1, 5)
+
+    input_files = sorted(glob.glob(f"{prefix}{input_directions[0]}/out-[0-9]*"))
+    input_atoms = [int(f.split("-")[-1]) for f in input_files]
+    print("Input atoms:", input_atoms)
+    # if atomlist is None:
+    #     output_atoms = input_atoms
+    # else:
+    #     output_atoms = np.where(input_atoms == atomlist)
+    # Find the indices of input_atoms that match the entries in atomlist
+    if atomlist is not None:
+        output_atoms = [i for i, atom in enumerate(input_atoms) if atom in atomlist]
+    else:
+        output_atoms = list(range(len(input_atoms)))
+    print("Output atoms:", output_atoms)
+
+    # input_atoms = range(1, 5)
 
     exchange_data: dict[str, list[RsptExchange]] = {}
 
     # Extract information from each input file
     for direction in input_directions:
-        print("Extracting exchange data from:", direction)
+        # print("Extracting exchange data from:", direction)
         exchange_data[direction] = []
         for atoms in input_atoms:
             # print(f"Atom: {atoms}")
-            file_name = f"spin-{direction}/out-{atoms}"
+            file_name = f"{prefix}{direction}/out-{atoms}"
             extracted_data = RsptExchange(file_name, maptype)
             exchange_data[direction].append(extracted_data.outmap)
 
@@ -127,7 +144,6 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None):
     # Filter out the Jij values so that only selected atoms are included
     # eg. only the magnetic atoms
     # j_truncated = downscale_exchange(summed_data, [1, 2])
-    print("Atomlist:", atomlist)
     if atomlist is None:
         j_truncated = np.array(summed_data, dtype=np.float32)
     else:
@@ -139,22 +155,32 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None):
     print_projections(j_dict, maptype)
 
     # Exctract data from an scf-run
-    scf_file = f"spin-{input_directions[-1]}/out-scf"
+    scf_file = f"{prefix}{input_directions[-1]}/out-scf"
     print("Extracting SCF data from:", scf_file)
     scf_data = RsptScf(scf_file)
 
     # Print the lattice file from any of the input files
+    print("-" * 50)
+    if atomlist:
+        print("Atomlist:")
+        print(atomlist)
+    filter_list = [i for i in output_atoms]
+    print("Filtered atoms:")
+    print(filter_list)
     print("Lattice:")
     print(scf_data.lattice)
     print("Basis:")
+    scf_data.basis = scf_data.basis[filter_list]
     print(scf_data.basis)
     print("Moments:")
+    scf_data.moments = scf_data.moments[filter_list]
     print(scf_data.moments)
     scf_data.print_lattice("lattice.dat")
     scf_data.print_positions("posfile")
     scf_data.print_moments("momfile")
     scf_data.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
     print("Extraction and storage completed successfully!")
+    print("-" * 50)
 
 
 def run_scf(filepath):
@@ -178,11 +204,11 @@ def run_scf(filepath):
     Author:
         Anders Bergman
     """
-    rspt_exchange = RsptScf(filepath)
-    rspt_exchange.print_lattice("lattice.dat")
-    rspt_exchange.print_positions("posfile")
-    rspt_exchange.print_moments("momfile")
-    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+    rspt_scf = RsptScf(filepath)
+    rspt_scf.print_lattice("lattice.dat")
+    rspt_scf.print_positions("posfile")
+    rspt_scf.print_moments("momfile")
+    rspt_scf.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
 
 
 def run_exchange(filepath, maptype="C"):
@@ -215,7 +241,7 @@ def main():
     This function sets up a command-line interface (CLI) with three options:
     - `-s` or `--scf`: Run the SCF workflow with the given file path.
     - `-e` or `--exchange`: Run the exchange workflow with the given file path.
-    - `-r` or `--run`: Run the default workflow with the given directories.
+    - `-d` or `--dir`: Run the default workflow with the given directories.
 
     The function then parses the arguments and calls the corresponding
     workflow function based on the provided options.
@@ -256,17 +282,25 @@ def main():
         help="Run exchange workflow with the given FILE_PATH",
     )
     parser.add_argument(
-        "-r",
-        "--run",
+        "-d",
+        "--dir",
         nargs=3,
         metavar=("DIRX", "DIRY", "DIRZ"),
-        help="Run default workflow with directories",
+        help="Declare custom directory suffixes, default is '100 010 001'",
     )
     parser.add_argument(
         "-m",
         "--maptype",
         type=str,
+        default="C",
         help="Output maptype: (C)artesian, (D)irect or maptype (3)",
+    )
+    parser.add_argument(
+        "-p",
+        "--prefix",
+        type=str,
+        default="spin-",
+        help="Directory prefix, default is 'spin-'",
     )
     parser.add_argument(
         "-a",
@@ -274,6 +308,19 @@ def main():
         nargs="+",
         type=int,
         help="List of atoms to extract exchange interactions for",
+    )
+    parser.add_argument(
+        "-t",
+        "--threshold",
+        type=float,
+        default=0.0,
+        help="Threshold for moment magnitudes. Default is 0.0",
+    )
+    parser.add_argument(
+        "-r",
+        "--radius",
+        type=float,
+        help="Radius for excange interaction cutoff",
     )
 
     # Parse the arguments
@@ -284,14 +331,20 @@ def main():
         run_scf(args.scf)
     elif args.exchange:
         run_exchange(args.exchange, args.maptype)
-    elif args.run:
+    elif args.dir:
         default_workflow(
-            input_directions=args.run, maptype=args.maptype, atomlist=args.atoms
+            input_directions=args.run,
+            maptype=args.maptype,
+            atomlist=args.atoms,
+            prefix=args.prefix,
         )
         # default_workflow(args.run[0], args.run[1], args.run[2])
     else:
         default_workflow(
-            input_directions=None, maptype=args.maptype, atomlist=args.atoms
+            input_directions=None,
+            maptype=args.maptype,
+            atomlist=args.atoms,
+            prefix=args.prefix,
         )
 
 
