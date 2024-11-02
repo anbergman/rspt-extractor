@@ -8,6 +8,7 @@ processing the extracted data, and saving the processed data to an output file.
 import importlib.resources
 import numpy as np
 from .rspt_extract import (
+    check_relativistic,
     extract_moments,
     extract_basis_vectors,
     extract_bravais_lattice_matrix,
@@ -41,7 +42,7 @@ class RsptScf:
     Author: Anders Bergman
     """
 
-    def __init__(self, file_path):
+    def __init__(self, file_name):
         """
         Initializes the class with the given file path and extracts data.
 
@@ -61,11 +62,12 @@ class RsptScf:
 
         Author: Anders Bergman
         """
-        self.file_path = file_path
+        self.file_name = file_name
         self.alat = None
         self.lattice = None
         self.basis = None
         self.moments = None
+        self.is_relativistic = False
         self.extract_scf_data()
 
     def extract_scf_data(self):
@@ -73,7 +75,7 @@ class RsptScf:
         Extracts and sets the lattice matrix, basis vectors, and moments from
         the specified file.
 
-        This method reads the file located at `self.file_path` and extracts
+        This method reads the file located at `self.file_name` and extracts
         the Bravais lattice matrix, basis vectors, and magnetic moments using
         the `rs` module's extraction functions. The extracted data is then
         assigned to the instance variables `self.alat`, `self.lattice`,
@@ -86,15 +88,29 @@ class RsptScf:
             None
 
         Raises:
-            IOError: If the file at `self.file_path` cannot be read.
+            IOError: If the file at `self.file_name` cannot be read.
             ValueError: If the extracted data is invalid or incomplete.
 
         Author:
             Anders Bergman
         """
-        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_path)
-        self.basis = extract_basis_vectors(self.file_path)
-        self.moments = extract_moments(self.file_path)
+        self.is_relativistic = check_relativistic(self.file_name)
+        print("Is the calculation relativistic?")
+        print(self.is_relativistic)
+
+        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_name)
+        print("SCF lattice matrix:")
+        print(self.lattice)
+        print("SCF lattice constant:")
+        print(self.alat)
+
+        self.basis = extract_basis_vectors(self.file_name)
+        print("SCF basis vectors:")
+        print(self.basis)
+
+        self.moments = extract_moments(self.file_name, self.is_relativistic)
+        print("SCF magnetic moments:")
+        print(self.moments)
 
     def print_lattice(self, output_path):
         """

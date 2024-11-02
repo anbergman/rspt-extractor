@@ -109,7 +109,37 @@ def transform_matrix(matrix):
     return transformed_matrix
 
 
-def extract_bravais_lattice_matrix(file_path):
+def check_relativistic(file_name):
+    """
+    Check if the calculation is relativistic.
+
+    This function reads a file and checks if the calculation is relativistic
+    by searching for the keyword "fulrel" in the file.
+
+    Args:
+        file_name (str): The path to the file containing the calculation data.
+
+    Returns:
+        bool: True if the calculation is relativistic, False otherwise.
+
+    Raises:
+        FileNotFoundError: If the file specified by `file_name` does not exist.
+
+    Example:
+        >>> is_relativistic = check_relativistic("path/to/file.txt")
+        >>> print(is_relativistic)
+     """
+    with open(file_name, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+
+    for i, line in enumerate(lines):
+        if "fulrel" in line:
+            return lines[i + 1].strip().split()[0] == "T"
+
+    return False
+
+
+def extract_bravais_lattice_matrix(file_name):
     """
     Extracts the Bravais lattice matrix from a given file.
 
@@ -142,7 +172,7 @@ def extract_bravais_lattice_matrix(file_path):
         Anders Bergman
     """
     # print("Extracting bravais lattice matrix from:", file_path)
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_name, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     matrix = []
@@ -167,14 +197,17 @@ def extract_bravais_lattice_matrix(file_path):
     return alat, np.array(matrix)
 
 
-def extract_moments(file_path):
+def extract_moments(file_name, is_relativistic):
     """
     Extracts magnetic moments from a specified file.
 
     This function reads a file containing magnetic moment data and extracts the
     spin, orbital, and total moments. The data is expected to be in a specific
-    format where the line containing "type           spin     orbital       total"
-    marks the beginning of the relevant data section.
+    format where the line containing
+    "type           spin     orbital       total"
+    marks the beginning of the relevant data section for relativistic data, and
+    "type        spin"
+    for non-relativistic data.
 
     Args:
         file_path (str): The path to the file containing the magnetic moment data.
@@ -198,31 +231,46 @@ def extract_moments(file_path):
     Author:
         Anders Bergman
     """
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_name, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     moments = []
     capture = False
     captured = False
 
-    for line in lines:
-        if "type           spin     orbital       total" in line:
-            capture = True
-            continue
-
-        if capture and not captured:
-            # Check if the line has three floating point numbers
-            values = line.split()
-            if values[0] == "total":
-                captured = True
-                capture = False
+    if is_relativistic:
+        for line in lines:
+            if "type           spin     orbital       total" in line:
+                capture = True
                 continue
-            moments.append([float(val) for val in values[1:4]])
+
+            if capture and not captured:
+                # Check if the line has three floating point numbers
+                values = line.split()
+                if values[0] == "total":
+                    captured = True
+                    capture = False
+                    continue
+                moments.append([float(val) for val in values[1:4]])
+    else:
+        for line in lines:
+            if "type        spin" in line:
+                capture = True
+                continue
+
+            if capture and not captured:
+                # Check if the line has three floating point numbers
+                values = line.split()
+                if len(values) == 0:
+                    captured = True
+                    capture = False
+                    continue
+                moments.append([float(val) for val in values[1:4]])
 
     return np.array(moments, dtype=np.float32)
 
 
-def extract_basis_vectors(file_path):
+def extract_basis_vectors(file_name):
     """
     Extracts basis vectors from a file.
 
@@ -233,7 +281,7 @@ def extract_basis_vectors(file_path):
     numpy.ndarray: An array of basis vectors.
 
     """
-    with open(file_path, "r", encoding="utf-8") as file:
+    with open(file_name, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
     vectors = []

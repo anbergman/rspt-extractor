@@ -183,7 +183,7 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None, prefix="
     print("-" * 50)
 
 
-def run_scf(filepath):
+def run_scf(file_name):
     """
     Run the SCF (Self-Consistent Field) calculation using the given file path.
 
@@ -204,7 +204,7 @@ def run_scf(filepath):
     Author:
         Anders Bergman
     """
-    rspt_scf = RsptScf(filepath)
+    rspt_scf = RsptScf(file_name)
     rspt_scf.print_lattice("lattice.dat")
     rspt_scf.print_positions("posfile")
     rspt_scf.print_moments("momfile")
@@ -273,13 +273,13 @@ def main():
 
     # CLI options
     parser.add_argument(
-        "-s", "--scf", type=str, help="Run SCF workflow with the given FILE_PATH"
+        "-s", "--scf", type=str, help="Run SCF workflow with the given FILE_NAME"
     )
     parser.add_argument(
         "-e",
         "--exchange",
         type=str,
-        help="Run exchange workflow with the given FILE_PATH",
+        help="Run exchange workflow with the given FILE_NAMES",
     )
     parser.add_argument(
         "-d",
