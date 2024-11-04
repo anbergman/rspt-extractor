@@ -52,10 +52,9 @@ from rspt_extractor import (
 )
 
 
-# def default_workflow(xstr="100", ystr="010", zstr="001"):
-def default_workflow(input_directions=None, maptype="C", atomlist=None, prefix="spin-"):
+def relativistic_workflow(input_directions=None, maptype="C", atomlist=None, prefix="spin-"):
     """
-    Main function to extract and process exchange data from RSPT output files.
+    Main function to extract and process relativistic exchange data from RSPT output files.
 
     This function performs the following steps:
     1. Defines input directions and atoms.
@@ -152,7 +151,7 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None, prefix="
     # Create the various projections you can make from the exchange interactions
     j_dict = extract_projections(j_truncated)
     # Print all projections to file
-    print_projections(j_dict, maptype)
+    print_projections(j_dict, maptype, is_relativistic=True)
 
     # Exctract data from an scf-run
     scf_file = f"{prefix}{input_directions[-1]}/out-scf"
@@ -178,12 +177,12 @@ def default_workflow(input_directions=None, maptype="C", atomlist=None, prefix="
     scf_data.print_lattice("lattice.dat")
     scf_data.print_positions("posfile")
     scf_data.print_moments("momfile")
-    scf_data.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+    scf_data.print_template("posfile", "momfile", "jfile.tensor", "inpsd.minimal")
     print("Extraction and storage completed successfully!")
     print("-" * 50)
 
 
-def run_scf(file_name):
+def run_scf(args):
     """
     Run the SCF (Self-Consistent Field) calculation using the given file path.
 
@@ -204,14 +203,14 @@ def run_scf(file_name):
     Author:
         Anders Bergman
     """
-    rspt_scf = RsptScf(file_name)
+    rspt_scf = RsptScf(args)
     rspt_scf.print_lattice("lattice.dat")
     rspt_scf.print_positions("posfile")
     rspt_scf.print_moments("momfile")
-    rspt_scf.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+    rspt_scf.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
 
 
-def run_exchange(filepath, maptype="C"):
+def run_exchange(args):
     """
     Executes the RSPT exchange process and saves the output to a file.
 
@@ -229,8 +228,80 @@ def run_exchange(filepath, maptype="C"):
     Author:
         Anders Bergman
     """
-    rspt_exchange = RsptExchange(filepath, maptype)
-    rspt_exchange.save_output("jfile.tensor")
+    # rspt_exchange = RsptExchange(args)
+    # rspt_exchange.save_exchange()
+
+    print("-" * 50)
+
+    input_files = args.exchange
+    atomlist = args.atoms
+    exchange_list: list[RsptExchange] = []
+    exchange_data = []
+
+    for file_name in input_files:
+        extracted_data = RsptExchange(file_name, args.maptype)
+        exchange_list.append(extracted_data)
+        exchange_data.append(extracted_data.outmap)
+
+    concatenated_data = np.concatenate(exchange_data)
+    input_atoms = np.unique(concatenated_data[:, 0]).astype(np.int32).tolist()
+
+    # Find the indices of input_atoms that match the entries in atomlist
+    print("Input atoms:", input_atoms)
+    if atomlist is not None:
+        output_atoms = [i for i, atom in enumerate(input_atoms) if atom in atomlist]
+    else:
+        # output_atoms = [ i + 1 for i in input_atoms]
+        output_atoms = list(range(len(input_atoms)))
+    print("Output atoms:", output_atoms)
+
+    # Filter out the Jij values so that only selected atoms are included
+    # eg. only the magnetic atoms
+    if atomlist is None:
+        j_truncated = downscale_exchange(concatenated_data, input_atoms)
+    else:
+        j_truncated = downscale_exchange(concatenated_data, atomlist)
+
+    j_dict = extract_projections(j_truncated, is_relativistic=False)
+    # Print all projections to file
+    print_projections(j_dict, args.maptype, is_relativistic=False)
+
+    # Filter data according to available atoms
+    if atomlist:
+        print(f"Atomlist: {atomlist}")
+        filter_list = atomlist
+    else:
+        filter_list = [i + 1 for i in input_atoms]
+
+    print(f"Filtered atoms: {filter_list}")
+
+    # Exctract data from an scf-run
+    print("-" * 50)
+    if args.scf:
+        scf_data = RsptScf(args)
+        lattice = scf_data.lattice
+        basis = scf_data.basis
+        moments = scf_data.moments
+    else:
+        lattice = exchange_list[0].lattice
+        basis = [obj.r_i for obj in exchange_list]
+        moments = [1.0 for obj in exchange_list]
+        print("No SCF file provided, full `UppASD` template not generated.")
+        return
+
+    # Print the lattice file from any of the input files
+    print(f"Lattice:{lattice}")
+    basis = basis[filter_list]
+    print(f"Basis: {basis}")
+    moments = moments[filter_list]
+    print(f"Moments: {moments}")
+
+    scf_data.print_lattice("lattice.dat")
+    scf_data.print_positions("posfile")
+    scf_data.print_moments("momfile")
+    scf_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+    print("Extraction and storage completed successfully!")
+    print("-" * 50)
 
 
 def main():
@@ -273,20 +344,26 @@ def main():
 
     # CLI options
     parser.add_argument(
-        "-s", "--scf", type=str, help="Run SCF workflow with the given FILE_NAME"
+        "-d", "--data", type=str, help="FILE_NAME for RSPt input data"
+    )
+    parser.add_argument(
+        "-s", "--scf", type=str, help="FILE_NAME for RSPt SCF output data"
     )
     parser.add_argument(
         "-e",
         "--exchange",
         type=str,
-        help="Run exchange workflow with the given FILE_NAMES",
+        nargs="+",
+        metavar="FILE_NAME",
+        help="Run exchange workflow for the given FILE_NAMEs",
     )
     parser.add_argument(
-        "-d",
-        "--dir",
-        nargs=3,
-        metavar=("DIRX", "DIRY", "DIRZ"),
-        help="Declare custom directory suffixes, default is '100 010 001'",
+        "-r",
+        "--relativistic-exchange",
+        type=str,
+        nargs='+',
+        metavar="FILE_NAME",
+        help="Run relativistic exchange workflow for the given FILE_NAMEs",
     )
     parser.add_argument(
         "-m",
@@ -295,13 +372,13 @@ def main():
         default="C",
         help="Output maptype: (C)artesian, (D)irect or maptype (3)",
     )
-    parser.add_argument(
-        "-p",
-        "--prefix",
-        type=str,
-        default="spin-",
-        help="Directory prefix, default is 'spin-'",
-    )
+    # parser.add_argument(
+    #     "-p",
+    #     "--prefix",
+    #     type=str,
+    #     default="spin-",
+    #     help="Directory prefix, default is 'spin-'",
+    # )
     parser.add_argument(
         "-a",
         "--atoms",
@@ -317,8 +394,8 @@ def main():
         help="Threshold for moment magnitudes. Default is 0.0",
     )
     parser.add_argument(
-        "-r",
-        "--radius",
+        "-c",
+        "--cutoff",
         type=float,
         help="Radius for excange interaction cutoff",
     )
@@ -326,21 +403,24 @@ def main():
     # Parse the arguments
     args = parser.parse_args()
 
+    print(50 * '-')
+    for arg in vars(args):
+        print(f"{arg}: {getattr(args, arg)}")
     # Decide which function to run based on the CLI arguments
-    if args.scf:
-        run_scf(args.scf)
-    elif args.exchange:
-        run_exchange(args.exchange, args.maptype)
-    elif args.dir:
-        default_workflow(
-            input_directions=args.run,
-            maptype=args.maptype,
-            atomlist=args.atoms,
-            prefix=args.prefix,
-        )
-        # default_workflow(args.run[0], args.run[1], args.run[2])
+    if args.exchange:
+        run_exchange(args)
+    # elif args.dir:
+    #     relativistic_workflow(
+    #         input_directions=args.run,
+    #         maptype=args.maptype,
+    #         atomlist=args.atoms,
+    #         prefix=args.prefix,
+    #     )
+    #     # default_workflow(args.run[0], args.run[1], args.run[2])
+    # elif args.scf:
+    #     run_scf(args)
     else:
-        default_workflow(
+        relativistic_workflow(
             input_directions=None,
             maptype=args.maptype,
             atomlist=args.atoms,

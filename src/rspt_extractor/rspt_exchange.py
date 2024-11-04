@@ -17,8 +17,10 @@ Author:
 
 import numpy as np
 from .rspt_extract import (
+    check_relativistic,
     extract_bravais_lattice_matrix,
     extract_exchange_matrices,
+    extract_exchange_scalars,
     extract_distance_vectors,
     extract_basis_vectors,
     convert_to_maptype_three,
@@ -58,7 +60,7 @@ class RsptExchange:
         process_xc_data():
             Processes the extracted data.
 
-        save_output(output_path: str):
+        save_tensor(output_path: str):
             Saves the processed data to a specified output file.
 
     Example:
@@ -68,13 +70,13 @@ class RsptExchange:
         rspt_exchange = RsptExchange(file_path)
         rspt_exchange.extract_xc_data()
         rspt_exchange.process_xc_data()
-        rspt_exchange.save_output(output_path)
+        rspt_exchange.save_tensor(output_path)
 
     Author:
         Anders Bergman
     """
 
-    def __init__(self, file_path, maptype="C"):
+    def __init__(self, exchange, maptype="C"):
         """
         This constructor sets up the RsptExchange object by initializing its
         attributes and calling methods to extract and process data from the
@@ -97,22 +99,25 @@ class RsptExchange:
         Author: Anders Bergman
         """
         # print("Running exchange workflow with file:", file_path, "maptype:", maptype)
-        self.file_path = file_path
+        self.file_name = exchange
+        self.maptype = maptype
+        self.is_relativistic = False
         self.alat = None
-        self.lattice = None
+        self.lattice = []
         self.matrices = None
         self.i_atom = None
-        self.r_i = None
+        self.r_i = []
         self.j_atoms = None
-        self.d_ij = None
-        self.r_ij = None
-        self.basis = None
-        self.s_ij = None
+        self.d_ij = []
+        self.j_ij = []
+        self.r_ij = []
+        self.basis = []
+        self.s_ij = []
         self.outmap = None
-        self.extract_xc_data(maptype)
+        self.extract_xc_data()
         self.process_xc_data()
 
-    def extract_xc_data(self, maptype="C"):
+    def extract_xc_data(self):
         """
         Extracts various data from the specified file and assigns it to instance
         variables.
@@ -145,10 +150,21 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
+        self.is_relativistic = check_relativistic(self.file_name)
+        print(f"Is the calculation relativistic? {self.is_relativistic}")
+
         # Extracts the Bravais lattice matrix and lattice constant
-        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_path)
-        # Extracts the exchange matrices (J, D, A)
-        self.matrices = extract_exchange_matrices(self.file_path)
+        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_name)
+
+        # Extract basis vectors
+        self.basis = extract_basis_vectors(self.file_name)
+
+        if self.is_relativistic:
+            # Extracts the exchange matrices (J, D, A)
+            self.matrices = extract_exchange_matrices(self.file_name[0])
+        else:
+            # Exctract scalar exchange couplings
+            self.j_ij = extract_exchange_scalars(self.file_name)
         # Extract bond info. r_i, r_ij in cartesian coordinates, d_ij = |r_ij|
         (
             self.i_atom,
@@ -156,19 +172,20 @@ class RsptExchange:
             self.j_atoms,
             self.d_ij,
             self.r_ij,
-        ) = extract_distance_vectors(self.file_path)
-        # Extract basis vectors
-        self.basis = extract_basis_vectors(self.file_path)
+        ) = extract_distance_vectors(self.file_name)
+
+        print("Exchange matrices:")
+        # print(self.r_ij)
         # Convert to map type
-        if maptype == "3" or maptype == "2":
+        if self.maptype == "3" or self.maptype == "2":
             self.s_ij = convert_to_maptype_three(
                 self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
             )
-        elif maptype == "D":
+        elif self.maptype == "D":
             self.s_ij = convert_to_direct(
                 self.basis, self.lattice, self.alat, self.r_ij
             )
-        elif maptype == "C":
+        elif self.maptype == "C":
             self.s_ij = self.r_ij / self.alat
         else:
             raise ValueError("Invalid maptype specified.")
@@ -197,18 +214,58 @@ class RsptExchange:
             Anders Bergman
         """
         outmap = []
-        for idx, _ in enumerate(self.r_ij):
-            i_list = [
-                self.i_atom,
-                self.j_atoms[idx],
-                self.s_ij[idx],
-                transform_matrix(self.matrices[idx]).flatten(),
-                self.d_ij[idx] / self.alat,
-            ]
-            outmap.append(flatten_and_concatenate(i_list))
+        if self.is_relativistic:
+            for idx, _ in enumerate(self.r_ij):
+                i_list = [
+                    self.i_atom,
+                    self.j_atoms[idx],
+                    self.s_ij[idx],
+                    transform_matrix(self.matrices[idx]).flatten(),
+                    self.d_ij[idx] / self.alat,
+                ]
+                outmap.append(flatten_and_concatenate(i_list))
+        else:
+            print(len(self.r_ij))
+            for idx, _ in enumerate(self.r_ij):
+                i_list = [
+                    self.i_atom,
+                    self.j_atoms[idx],
+                    self.s_ij[idx],
+                    self.j_ij[idx],
+                    self.d_ij[idx] / self.alat,
+                ]
+                outmap.append(flatten_and_concatenate(i_list))
         self.outmap = np.array(outmap)
 
-    def save_output(self, output_path):
+    def save_exchange(self, output_file=None):
+        """
+        Save the exchange matrix to a specified file.
+
+        This method saves the `self.matrices` array to the given `output_path` using
+        a specific format for the data. The format includes both integer and float
+        values with defined precision.
+
+        Args:
+            output_path (str): The path to the file where the output will be saved.
+
+        Returns:
+            None
+
+        Example:
+            >>> obj.save_exchange('/path/to/output/file.txt')
+        """
+        if self.is_relativistic:
+            if output_file is None:
+                self.save_tensor("jfile.tensor")
+            else:
+                self.save_tensor(output_file)
+        else:
+            if output_file is None:
+                self.save_scalar("jfile.scalar")
+            else:
+                self.save_scalar(output_file)
+
+    def save_tensor(self, output_path):
         """
         Save the output map to a specified file.
 
@@ -223,7 +280,7 @@ class RsptExchange:
             None
 
         Example:
-            >>> obj.save_output('/path/to/output/file.txt')
+            >>> obj.save_tensor('/path/to/output/file.txt')
 
         Author:
             Anders Bergman
@@ -232,6 +289,31 @@ class RsptExchange:
         fmt2 = "% 10.6f % 10.6f % 10.6f  % 10.6f "
         fmt3 = "% 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f     %8.4f"
         fmt = fmt1 + fmt2 + fmt3
+        np.savetxt(output_path, self.outmap, fmt=fmt)
+
+    def save_scalar(self, output_path):
+        """
+        Save the output map to a specified file.
+
+        This method saves the `self.outmap` array to the given `output_path` using
+        a specific format for the data. The format includes both integer and float
+        values with defined precision.
+
+        Args:
+            output_path (str): The path to the file where the output will be saved.
+
+        Returns:
+            None
+
+        Example:
+            >>> obj.save_tensor('/path/to/output/file.txt')
+
+        Author:
+            Anders Bergman
+        """
+        fmt1 = "%4d %4d   % 4.1f % 4.1f % 4.1f   "
+        fmt2 = "  % 10.6f     %8.4f"
+        fmt = fmt1 + fmt2
         np.savetxt(output_path, self.outmap, fmt=fmt)
 
 
@@ -272,7 +354,7 @@ def downscale_exchange(exchange, mask_list=None):
         return np.array(masked_data, dtype=np.float32)
 
 
-def extract_projections(exchange):
+def extract_projections(exchange, is_relativistic=True):
     """
     Extracts various projections from the exchange matrix.
 
@@ -300,29 +382,36 @@ def extract_projections(exchange):
     natom = exchange.shape[0]
     j_dict = {}
     j_dict["scalar"] = np.zeros((natom, 1))
-    j_dict["diagonal"] = np.zeros((natom, 9))
     j_dict["tensor"] = np.zeros((natom, 9))
-    j_dict["dmi"] = np.zeros((natom, 3))
-    j_dict["symmetric"] = np.zeros((natom, 3))
-    for irow, row in enumerate(exchange):
-        j_mat = row[5:14].reshape(3, 3)
-        j_mat_sym = 0.5 * (j_mat + j_mat.T)
-        j_mat_asym = 0.5 * (j_mat - j_mat.T)
-        dmi = np.array([j_mat_asym[1, 2], j_mat_asym[2, 0], j_mat_asym[0, 1]])
-        jsy = np.array([j_mat_sym[1, 2], j_mat_sym[2, 0], j_mat_sym[0, 1]])
-        j_dict["scalar"][irow] = np.trace(j_mat) / 3.0
-        j_dict["diagonal"][irow] = np.diag(np.diag(j_mat)).flatten()
-        j_dict["dmi"][irow] = dmi
-        j_dict["symmetric"][irow] = jsy
-        j_dict["tensor"][irow] = j_mat.flatten()
+    if is_relativistic:
+        j_dict["diagonal"] = np.zeros((natom, 9))
+        j_dict["dmi"] = np.zeros((natom, 3))
+        j_dict["symmetric"] = np.zeros((natom, 3))
+        for irow, row in enumerate(exchange):
+            j_mat = row[5:14].reshape(3, 3)
+            j_mat_sym = 0.5 * (j_mat + j_mat.T)
+            j_mat_asym = 0.5 * (j_mat - j_mat.T)
+            dmi = np.array([j_mat_asym[1, 2], j_mat_asym[2, 0], j_mat_asym[0, 1]])
+            jsy = np.array([j_mat_sym[1, 2], j_mat_sym[2, 0], j_mat_sym[0, 1]])
+            j_dict["scalar"][irow] = np.trace(j_mat) / 3.0
+            j_dict["tensor"][irow] = j_mat.flatten()
+            j_dict["diagonal"][irow] = np.diag(np.diag(j_mat)).flatten()
+            j_dict["dmi"][irow] = dmi
+            j_dict["symmetric"][irow] = jsy
+        j_dict["right"] = exchange[:, 14:]
+    else:
+        for irow, row in enumerate(exchange):
+            j_mat = row[5] * np.eye(3)
+            j_dict["scalar"][irow] = np.trace(j_mat) / 3.0
+            j_dict["tensor"][irow] = j_mat.flatten()
+        j_dict["right"] = exchange[:, 6:]
 
     j_dict["left"] = exchange[:, 0:5]
-    j_dict["right"] = exchange[:, 14:]
 
     return j_dict
 
 
-def print_projections(j_dict, maptype="C"):
+def print_projections(j_dict, maptype="C", is_relativistic=True):
     """
     Save projections from a dictionary to files with specific formatting.
 
@@ -340,11 +429,11 @@ def print_projections(j_dict, maptype="C"):
         None
 
     Files Created:
-        - j_scalar.dat
-        - j_diagonal.dat
-        - j_dmi.dat
-        - j_symmetric.dat
-        - j_tensor.dat
+        - jfile
+        - jfile.diag
+        - dmfile
+        - cfile
+        - jfile.tensor
 
     Example:
         j_dict = {
@@ -367,12 +456,20 @@ def print_projections(j_dict, maptype="C"):
     fmt_9 = "% 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f  % 10.6f % 10.6f % 10.6f"
     fmt_r = "     %8.4f"
 
-    keys = ["scalar", "diagonal", "dmi", "symmetric", "tensor"]
-    fmts = [fmt_1, fmt_9, fmt_3, fmt_3, fmt_9]
+    if is_relativistic:
+        keys = ["scalar", "diagonal", "dmi", "symmetric", "tensor"]
+        fnames = ["jfile", "jfile.diag", "dmfile", "cfile", "jfile.tensor"]
+        fmts = [fmt_1, fmt_9, fmt_3, fmt_3, fmt_9]
+    else:
+        keys = ["scalar", "tensor"]
+        fnames = ["jfile", "jfile.tensor"]
+        fmts = [fmt_1, fmt_9]
 
     for idx, key in enumerate(keys):
         outmat = np.hstack((j_dict["left"], j_dict[key], j_dict["right"]))
-        fname = f"j_{key}.dat"
+        print(key, outmat.shape)
+        print(outmat[0])
+        fname = fnames[idx]
         np.savetxt(fname, outmat, fmt=fmt_l + fmts[idx] + fmt_r)
     print("Projections saved to files.")
 
@@ -383,4 +480,4 @@ if __name__ == "__main__":
     OUTPUT_PATH = "outmap.txt"
 
     rspt_exchange = RsptExchange(FILE_PATH)
-    rspt_exchange.save_output(OUTPUT_PATH)
+    rspt_exchange.save_tensor(OUTPUT_PATH)

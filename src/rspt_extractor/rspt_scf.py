@@ -42,7 +42,7 @@ class RsptScf:
     Author: Anders Bergman
     """
 
-    def __init__(self, file_name):
+    def __init__(self, args):
         """
         Initializes the class with the given file path and extracts data.
 
@@ -62,12 +62,13 @@ class RsptScf:
 
         Author: Anders Bergman
         """
-        self.file_name = file_name
+        self.file_name = args.scf
         self.alat = None
         self.lattice = None
         self.basis = None
         self.moments = None
         self.is_relativistic = False
+        self.threshold = args.threshold
         self.extract_scf_data()
 
     def extract_scf_data(self):
@@ -95,22 +96,33 @@ class RsptScf:
             Anders Bergman
         """
         self.is_relativistic = check_relativistic(self.file_name)
-        print("Is the calculation relativistic?")
-        print(self.is_relativistic)
+        print(f"Is the calculation relativistic? {self.is_relativistic}")
 
         self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_name)
-        print("SCF lattice matrix:")
-        print(self.lattice)
-        print("SCF lattice constant:")
-        print(self.alat)
+        print(f"SCF lattice matrix: {self.lattice}")
+        print(f"SCF lattice constant: {self.alat}")
 
         self.basis = extract_basis_vectors(self.file_name)
-        print("SCF basis vectors:")
-        print(self.basis)
+        print(f"SCF basis vectors: {self.basis}")
 
         self.moments = extract_moments(self.file_name, self.is_relativistic)
         print("SCF magnetic moments:")
         print(self.moments)
+
+        # Filter out moments with magnitude below the threshold
+        print(f"Moment threshold: {self.threshold}")
+        tmp_moments = []
+        tmp_basis = []
+        for i, moment in enumerate(self.moments):
+            # Check total (mS+mL) moment
+            if np.abs(moment[2]) >= self.threshold:
+                tmp_moments.append(moment)
+                tmp_basis.append(self.basis[i])
+
+        self.moments = np.array(tmp_moments)
+        self.basis = np.array(tmp_basis)
+        del tmp_moments
+        del tmp_basis
 
     def print_lattice(self, output_path):
         """
@@ -255,4 +267,4 @@ if __name__ == "__main__":
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")
     rspt_exchange.print_moments("momfile")
-    rspt_exchange.print_template("posfile", "momfile", "j_scalar.dat", "inpsd.minimal")
+    rspt_exchange.print_template("posfile", "momfile", "jfile", "inpsd.minimal")

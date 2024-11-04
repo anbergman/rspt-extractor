@@ -265,7 +265,7 @@ def extract_moments(file_name, is_relativistic):
                     captured = True
                     capture = False
                     continue
-                moments.append([float(val) for val in values[1:4]])
+                moments.append([float(values[1]), 0.0, float(values[1])])
 
     return np.array(moments, dtype=np.float32)
 
@@ -419,6 +419,54 @@ def extract_exchange_matrices(file_path):
                         current_matrix = []
 
     return matrices
+
+
+def extract_exchange_scalars(file_path):
+    """
+    Extracts exchange interactions from a specified file.
+
+    This function reads a file containing calculated quantities in the global
+    coordinate system and extracts exchange constants. The constants are
+    identified by specific markers in the file and are returned as a list of
+    NumPy arrays.
+
+    Args:
+        file_path (str): The path to the file containing the exchange matrices.
+
+    Returns:
+        List[np.ndarray]: A list of 3x3 NumPy arrays representing the exchange
+        matrices.
+
+    Raises:
+        FileNotFoundError: If the specified file does not exist.
+        ValueError: If the file contains invalid data that cannot be parsed
+        into matrices.
+
+    Example:
+        >>> matrices = extract_exchange_matrices("path/to/file.txt")
+        >>> for matrix in matrices:
+        >>>     print(matrix)
+
+    Author:
+        Anders Bergman
+    """
+    with open(file_path, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+
+    couplings = []
+    capture = False
+
+    for line in lines:
+        if "Neighbor     dist." in line:
+            capture = True
+            continue
+        if "END" in line:
+            capture = False
+
+        if capture:
+            couplings.append(float(line.split()[-1]))
+
+    return couplings
 
 
 def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
