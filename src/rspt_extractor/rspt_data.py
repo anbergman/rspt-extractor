@@ -105,11 +105,13 @@ class RsptData:
         # Extract lattice and moments from the SCF file
         if self.scf_file:
             self.is_relativistic = check_relativistic(self.scf_file)
-            print(f"Is the calculation relativistic? {self.is_relativistic}")
+            # print(f"Is the calculation relativistic? {self.is_relativistic}")
 
             self.alat, self.lattice = extract_lattice_scf(self.scf_file)
-            print(f"SCF lattice matrix: {self.lattice}")
-            print(f"SCF lattice constant: {self.alat}")
+            print("SCF lattice matrix: [alat]")
+            for row in self.lattice:
+                print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
+            print(f"SCF lattice constant [a.u.]:\n  {self.alat}")
 
             scf_moments = extract_moments_scf(self.scf_file, self.is_relativistic)
 
@@ -117,7 +119,9 @@ class RsptData:
         if self.data_file:
             types, self.basis = extract_position_data(self.data_file)
             self.atoms = range(0, len(types))
-            print(f"data basis vectors: {self.basis}")
+            print("`data` basis vectors: (crystal)")
+            for row in self.basis:
+                print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
 
         # Extract moments from the SCF file
         if self.scf_file and self.data_file:
@@ -125,7 +129,7 @@ class RsptData:
             for atom in types:
                 # print(f"Atom type: {atom}")
                 self.moments.append(scf_moments[atom - 1].tolist())
-            print("SCF magnetic moments:")
+            print("SCF magnetic moments: [mu_B/atom] ")
             print([mom[2] for mom in self.moments])
 
             # Filter out moments with magnitude below the threshold

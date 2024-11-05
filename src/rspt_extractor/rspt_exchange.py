@@ -98,7 +98,6 @@ class RsptExchange:
 
         Author: Anders Bergman
         """
-        # print("Running exchange workflow with file:", file_path, "maptype:", maptype)
         self.file_name = exchange
         self.maptype = maptype
         self.is_relativistic = False
@@ -151,7 +150,6 @@ class RsptExchange:
         Author: Anders Bergman
         """
         self.is_relativistic = check_relativistic(self.file_name)
-        # print(f"Is the calculation relativistic? {self.is_relativistic}")
 
         # Extracts the Bravais lattice matrix and lattice constant
         self.alat, self.lattice = extract_lattice_scf(self.file_name)
@@ -161,7 +159,7 @@ class RsptExchange:
 
         if self.is_relativistic:
             # Extracts the exchange matrices (J, D, A)
-            self.matrices = extract_exchange_matrices(self.file_name[0])
+            self.matrices = extract_exchange_matrices(self.file_name)
         else:
             # Exctract scalar exchange couplings
             self.j_ij = extract_exchange_scalars(self.file_name)
@@ -178,12 +176,15 @@ class RsptExchange:
         # Convert to map type
         if self.maptype == "3" or self.maptype == "2":
             self.s_ij = convert_to_maptype_three(
-                self.j_atoms, self.basis, self.lattice, self.alat, self.r_ij
+                self.i_atom,
+                self.j_atoms,
+                self.basis,
+                self.lattice,
+                self.alat,
+                self.r_ij,
             )
         elif self.maptype == "D":
-            self.s_ij = convert_to_direct(
-                self.basis, self.lattice, self.alat, self.r_ij
-            )
+            self.s_ij = convert_to_direct(self.lattice, self.alat, self.r_ij)
         elif self.maptype == "C":
             self.s_ij = self.r_ij / self.alat
         else:

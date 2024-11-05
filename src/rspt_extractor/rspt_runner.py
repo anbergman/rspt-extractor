@@ -40,7 +40,6 @@ Attributes:
 
 """
 
-import glob
 import argparse
 import numpy as np
 from rspt_extractor import (
@@ -53,9 +52,7 @@ from rspt_extractor import (
 )
 
 
-def relativistic_workflow(
-    input_directions=None, maptype="C", atomlist=None, prefix="spin-"
-):
+def rspt_relativistic_workflow(args):
     """
     Main function to extract and process relativistic exchange data
     from RSPT output files.
@@ -85,42 +82,52 @@ def relativistic_workflow(
     Author:
         Anders Bergman
     """
-    print("-" * 50)
+
+    print(50 * "-")
+    print("Relativistic exchange workflow")
     # Define input directions and atoms
-    if input_directions is None:
-        input_directions = ["100", "010", "001"]
-
-    input_files = sorted(glob.glob(f"{prefix}{input_directions[0]}/out-[0-9]*"))
-    input_atoms = [int(f.split("-")[-1]) for f in input_files]
-    print("Input atoms:", input_atoms)
-    # if atomlist is None:
-    #     output_atoms = input_atoms
-    # else:
-    #     output_atoms = np.where(input_atoms == atomlist)
-    # Find the indices of input_atoms that match the entries in atomlist
-    if atomlist is not None:
-        output_atoms = [i for i, atom in enumerate(input_atoms) if atom in atomlist]
-    else:
-        output_atoms = list(range(len(input_atoms)))
-    print("Output atoms:", output_atoms)
-
-    # input_atoms = range(1, 5)
+    input_directions = ["100", "010", "001"]
+    atomlist = args.atoms
+    input_files = {
+        input_directions[0]: args.rx,
+        input_directions[1]: args.ry,
+        input_directions[2]: args.rz,
+    }
 
     exchange_data: dict[str, list[RsptExchange]] = {}
 
     # Extract information from each input file
     for direction in input_directions:
-        # print("Extracting exchange data from:", direction)
+        print("Extracting exchange data from:", direction)
         exchange_data[direction] = []
-        for atoms in input_atoms:
+        for file_name in input_files[direction]:
             # print(f"Atom: {atoms}")
-            file_name = f"{prefix}{direction}/out-{atoms}"
-            extracted_data = RsptExchange(file_name, maptype)
+            extracted_data = RsptExchange(file_name, args.maptype)
             exchange_data[direction].append(extracted_data.outmap)
 
     concatenated_data: dict[str, np.ndarray] = {}
     for key, value in exchange_data.items():
-        concatenated_data[key] = np.concatenate([v for v in value])
+        concatenated_data[key] = np.concatenate(value)
+
+    input_atoms = np.unique(concatenated_data["001"][:, 0]).astype(np.int32).tolist()
+
+    # Find the indices of input_atoms that match the entries in atomlist
+    print(f"Input atoms: \n  {input_atoms}")
+    if atomlist is not None:
+        output_atoms = [i for i, atom in enumerate(input_atoms) if atom in atomlist]
+    else:
+        # output_atoms = [ i + 1 for i in input_atoms]
+        output_atoms = list(range(len(input_atoms)))
+    print(f"Output atoms: \n  {output_atoms}")
+
+    # Filter data according to available atoms
+    if atomlist:
+        print(f"Atomlist: {atomlist}")
+        filter_list = [i - 1 for i in atomlist]
+    else:
+        filter_list = [i - 1 for i in input_atoms]
+
+    print(f"Filtered atoms: \n  {filter_list}")
 
     # Masks for extracting the "best" estimates for J, D, A
     # Example: spin-axis x gives Dx and Ax but J as 0.5*(Jyy*Jzz)
@@ -144,49 +151,42 @@ def relativistic_workflow(
         np.array(masked_data["001"] + masked_data["010"] + masked_data["100"]) / 3.0
     )
 
+    # Exctract data from an scf-run
+    print(50 * "-")
+    print("Extracting SCF data")
+    if args.scf and args.data:
+        scf_data = RsptData(args)
+        # Print the lattice, basis, and moments information
+        scf_data.print_lattice("lattice.dat")
+        scf_data.print_positions("posfile")
+        scf_data.print_moments("momfile")
+        scf_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+    else:
+        print(
+            "No SCF and/or `data` file provided, full `UppASD` template not generated."
+        )
+
     # Filter out the Jij values so that only selected atoms are included
     # eg. only the magnetic atoms
     # j_truncated = downscale_exchange(summed_data, [1, 2])
     if atomlist is None:
-        j_truncated = np.array(summed_data, dtype=np.float64)
+        # j_truncated = downscale_exchange(concatenated_data, input_atoms)
+        print("Thresholded atoms:", scf_data.filter_list)
+        j_filtered = downscale_exchange(summed_data, scf_data.filter_list)
+        # j_truncated = np.array(summed_data, dtype=np.float64)
     else:
-        j_truncated = downscale_exchange(summed_data, atomlist)
+        j_filtered = downscale_exchange(summed_data, atomlist)
 
     # Create the various projections you can make from the exchange interactions
-    j_dict = extract_projections(j_truncated)
+    j_dict = extract_projections(j_filtered)
     # Print all projections to file
-    print_projections(j_dict, maptype, is_relativistic=True)
+    print_projections(j_dict, args.maptype, is_relativistic=True)
 
-    # Exctract data from an scf-run
-    scf_file = f"{prefix}{input_directions[-1]}/out-scf"
-    print("Extracting SCF data from:", scf_file)
-    scf_data = RsptData(scf_file)
-
-    # Print the lattice file from any of the input files
-    print("-" * 50)
-    if atomlist:
-        print("Atomlist:")
-        print(atomlist)
-    filter_list = [i for i in output_atoms]
-    print("Filtered atoms:")
-    print(filter_list)
-    print("Lattice:")
-    print(scf_data.lattice)
-    print("Basis:")
-    scf_data.basis = scf_data.basis[filter_list]
-    print(scf_data.basis)
-    print("Moments:")
-    scf_data.moments = scf_data.moments[filter_list]
-    print(scf_data.moments)
-    scf_data.print_lattice("lattice.dat")
-    scf_data.print_positions("posfile")
-    scf_data.print_moments("momfile")
-    scf_data.print_template("posfile", "momfile", "jfile.tensor", "inpsd.minimal")
     print("Extraction and storage completed successfully!")
-    print("-" * 50)
+    print(50 * "-")
 
 
-def run_scf(args):
+def rspt_get_scf_data(args):
     """
     Read RSPt SCF (Self-Consistent Field) data using the given file path.
 
@@ -217,7 +217,7 @@ def run_scf(args):
     rspt_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
 
 
-def run_data(args):
+def rspt_get_input_data(args):
     """
     Read the input data for RSPt calculations to get structure info.
 
@@ -225,11 +225,10 @@ def run_data(args):
         Anders Bergman
     """
     types, pos = extract_position_data(args.data)
-    print("Types:", types)
-    print("Positions", pos)
+    return types, pos
 
 
-def run_exchange(args):
+def rspt_scalar_workflow(args):
     """
     Executes the RSPT exchange process and saves the output to a file.
 
@@ -249,7 +248,8 @@ def run_exchange(args):
     """
     # rspt_exchange = RsptExchange(args)
     # rspt_exchange.save_exchange()
-    print("-" * 50)
+    print(50 * "-")
+    print("Scalar exchange workflow")
 
     # Process the exchange interactions
     input_files = args.exchange
@@ -281,7 +281,7 @@ def run_exchange(args):
     else:
         filter_list = [i - 1 for i in input_atoms]
 
-    print(f"Filtered atoms: {filter_list}")
+    print(f"Filtered atoms: \n{filter_list}")
 
     # Exctract data from an scf-run
     print("-" * 50)
@@ -304,18 +304,6 @@ def run_exchange(args):
             "No SCF and/or `data` file provided, full `UppASD` template not generated."
         )
 
-    # Print the lattice file from any of the input files
-    # print(f"Lattice:{lattice}")
-    # print(f"Original Basis: {basis}")
-    # print(f"Atoms: {atoms}")
-    # print(f"Filter list: {filter_list}")
-    # basis = basis[filter_list]
-    # print(f"Basis: {basis}")
-    # moments = moments[filter_list]
-    # print(f"Moments: {moments}")
-    # atoms = atoms[filter_list]
-    # print(f"Atoms: {atoms}")
-
     # Filter out the Jij values so that only selected atoms are included
     # eg. only the magnetic atoms
     if atomlist is None:
@@ -328,7 +316,6 @@ def run_exchange(args):
 
     # Exctact all projections from the exchange interactions
     print("Extracting projections...")
-    print(j_filtered[0])
     j_extracted = extract_projections(j_filtered, is_relativistic=False)
 
     # Print all projections to file
@@ -337,7 +324,7 @@ def run_exchange(args):
     )
 
     print("Extraction and storage completed successfully!")
-    print("-" * 50)
+    print(50 * "-")
 
 
 def main():
@@ -392,12 +379,25 @@ def main():
         help="Run exchange workflow for the given FILE_NAMEs",
     )
     parser.add_argument(
-        "-r",
-        "--relativistic-exchange",
+        "--rx",
         type=str,
         nargs="+",
         metavar="FILE_NAME",
-        help="Run relativistic exchange workflow for the given FILE_NAMEs",
+        help="Input files for relativistic exchange workflow (x-direction)",
+    )
+    parser.add_argument(
+        "--ry",
+        type=str,
+        nargs="+",
+        metavar="FILE_NAME",
+        help="Input files for relativistic exchange workflow (y-direction)",
+    )
+    parser.add_argument(
+        "--rz",
+        type=str,
+        nargs="+",
+        metavar="FILE_NAME",
+        help="Input files for relativistic exchange workflow (z-direction)",
     )
     parser.add_argument(
         "-m",
@@ -406,13 +406,6 @@ def main():
         default="C",
         help="Output maptype: (C)artesian, (D)irect or maptype (3)",
     )
-    # parser.add_argument(
-    #     "-p",
-    #     "--prefix",
-    #     type=str,
-    #     default="spin-",
-    #     help="Directory prefix, default is 'spin-'",
-    # )
     parser.add_argument(
         "-a",
         "--atoms",
@@ -438,31 +431,19 @@ def main():
     args = parser.parse_args()
 
     print(50 * "-")
+    print(10 * " " + "RSPt Exchange Extraction Tool")
+    print(50 * "-")
+    print("Arguments:")
     for arg in vars(args):
-        print(f"{arg}: {getattr(args, arg)}")
+        print(f"  {arg}: {getattr(args, arg)}")
 
     # Decide which function to run based on the CLI arguments
     if args.exchange:
-        run_exchange(args)
-    # elif args.dir:
-    #     relativistic_workflow(
-    #         input_directions=args.run,
-    #         maptype=args.maptype,
-    #         atomlist=args.atoms,
-    #         prefix=args.prefix,
-    #     )
-    #     # default_workflow(args.run[0], args.run[1], args.run[2])
+        rspt_scalar_workflow(args)
+    elif args.rx and args.ry and args.rz:
+        rspt_relativistic_workflow(args)
     elif args.scf:
-        run_scf(args)
-    else:
-        relativistic_workflow(
-            input_directions=None,
-            maptype=args.maptype,
-            atomlist=args.atoms,
-            prefix=args.prefix,
-        )
-    if args.data:
-        run_data(args)
+        rspt_get_scf_data(args)
 
 
 if __name__ == "__main__":

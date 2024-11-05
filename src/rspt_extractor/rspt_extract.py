@@ -21,8 +21,9 @@ Functions:
 
     extract_exchange_matrices(file_path: str) -> list:
 
-    convert_to_maptype_three(j_atoms: list, basis: np.ndarray, lattice: np.ndarray,
-                             alat: float, r_ij: np.ndarray) -> np.ndarray:
+    convert_to_maptype_three(i_atom, j_atoms: list,
+                            basis: np.ndarray, lattice: np.ndarray,
+                            alat: float, r_ij: np.ndarray) -> np.ndarray:
 """
 
 import re
@@ -354,7 +355,7 @@ def extract_distance_vectors(file_path):
 
         if capture_glob:
             values = line.split()
-            r_ij.append(np.array(values[5:8], dtype=np.float64))
+            r_ij.append(np.array(values[5:8], dtype=np.float64) - r_i)
             d_ij.append(np.float64(values[10]))
             j_atom.append(np.int32(values[1]))
 
@@ -517,7 +518,7 @@ def extract_exchange_scalars(file_path):
     return couplings
 
 
-def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
+def convert_to_maptype_three(i_atom, j_atoms, basis, lattice, alat, r_ij):
     """
     Converts atomic positions to a specific map type (type three).
 
@@ -539,19 +540,19 @@ def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
         Anders Bergman
     """
     invlatt = np.linalg.inv(lattice)
-    basis[:, 2] = -basis[:, 2]
+    # basis[:, 2] = -basis[:, 2]
     s_ij = []
     for idx, vector in enumerate(r_ij):
-        # r_i = np.dot(lattice, basis[i_atom - 1])
+        r_i = np.dot(lattice, basis[i_atom - 1])
         r_j = np.dot(lattice, basis[j_atoms[idx] - 1])
         r_shift = vector / alat
-        v_ij = r_shift - r_j  # - r_i
+        v_ij = r_shift - (r_j - r_i)
         s_ij.append(np.dot(invlatt, v_ij))
 
     return np.array(s_ij, dtype=np.float64).round(4)
 
 
-def convert_to_direct(basis, lattice, alat, r_ij):
+def convert_to_direct(lattice, alat, r_ij):
     """
     Converts cartesian atomic positions direct coordinates
 
@@ -559,8 +560,6 @@ def convert_to_direct(basis, lattice, alat, r_ij):
     the mapped positions in a new coordinate system.
 
     Args:
-        j_atoms (list[int]): List of atom indices.
-        basis (np.ndarray): Basis vectors of the atomic positions.
         lattice (np.ndarray): Lattice vectors of the crystal.
         alat (float): Lattice constant.
         r_ij (np.ndarray): Relative positions between atoms.
@@ -573,10 +572,10 @@ def convert_to_direct(basis, lattice, alat, r_ij):
         Anders Bergman
     """
     invlatt = np.linalg.inv(lattice)
-    basis[:, 2] = -basis[:, 2]
+    # basis[:, 2] = -basis[:, 2]
     s_ij = []
     for vector in r_ij:
         r_shift = vector / alat
-        s_ij.append(np.dot(invlatt, r_shift))
+        s_ij.append(np.dot(invlatt.T, r_shift))
 
     return np.array(s_ij, dtype=np.float64).round(4)
