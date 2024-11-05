@@ -52,6 +52,48 @@ from rspt_extractor import (
 )
 
 
+def rspt_get_scf_data(args):
+    """
+    Read RSPt SCF (Self-Consistent Field) data using the given file path.
+
+    This function initializes an RsptData object with the provided file path and
+    generates several output files related to the lattice, atomic positions,
+    magnetic moments, and a template for further calculations.
+
+    Args:
+        filepath (str): The path to the input file required for the SCF
+                        calculation.
+
+    Outputs:
+        lattice.dat: File containing lattice information.
+        posfile: File containing atomic positions.
+        momfile: File containing magnetic moments.
+        inpsd.minimal: Template file for further calculations.
+
+    Author:
+        Anders Bergman
+    """
+    rspt_data = RsptData(args)
+    if rspt_data.scf_file:
+        rspt_data.print_lattice("lattice.dat")
+    if rspt_data.data_file:
+        rspt_data.print_positions("posfile")
+    if rspt_data.data_file and rspt_data.scf_file:
+        rspt_data.print_moments("momfile")
+    rspt_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+
+
+def rspt_get_input_data(args):
+    """
+    Read the input data for RSPt calculations to get structure info.
+
+    Author:
+        Anders Bergman
+    """
+    types, pos = extract_position_data(args.data)
+    return types, pos
+
+
 def rspt_relativistic_workflow(args):
     """
     Main function to extract and process relativistic exchange data
@@ -186,48 +228,6 @@ def rspt_relativistic_workflow(args):
     print(50 * "-")
 
 
-def rspt_get_scf_data(args):
-    """
-    Read RSPt SCF (Self-Consistent Field) data using the given file path.
-
-    This function initializes an RsptData object with the provided file path and
-    generates several output files related to the lattice, atomic positions,
-    magnetic moments, and a template for further calculations.
-
-    Args:
-        filepath (str): The path to the input file required for the SCF
-                        calculation.
-
-    Outputs:
-        lattice.dat: File containing lattice information.
-        posfile: File containing atomic positions.
-        momfile: File containing magnetic moments.
-        inpsd.minimal: Template file for further calculations.
-
-    Author:
-        Anders Bergman
-    """
-    rspt_data = RsptData(args)
-    if rspt_data.scf_file:
-        rspt_data.print_lattice("lattice.dat")
-    if rspt_data.data_file:
-        rspt_data.print_positions("posfile")
-    if rspt_data.data_file and rspt_data.scf_file:
-        rspt_data.print_moments("momfile")
-    rspt_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
-
-
-def rspt_get_input_data(args):
-    """
-    Read the input data for RSPt calculations to get structure info.
-
-    Author:
-        Anders Bergman
-    """
-    types, pos = extract_position_data(args.data)
-    return types, pos
-
-
 def rspt_scalar_workflow(args):
     """
     Executes the RSPT exchange process and saves the output to a file.
@@ -315,7 +315,6 @@ def rspt_scalar_workflow(args):
         j_filtered = downscale_exchange(concatenated_data, atomlist)
 
     # Exctact all projections from the exchange interactions
-    print("Extracting projections...")
     j_extracted = extract_projections(j_filtered, is_relativistic=False)
 
     # Print all projections to file

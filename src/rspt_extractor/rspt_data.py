@@ -7,6 +7,7 @@ processing the extracted data, and saving the processed data to an output file.
 
 import importlib.resources
 import numpy as np
+import spglib as spg
 from .rspt_extract import (
     check_relativistic,
     extract_moments_scf,
@@ -69,10 +70,13 @@ class RsptData:
         self.basis = None
         self.moments = None
         self.atoms = None
+        self.types = []
+        self.species = []
         self.filter_list = []
         self.is_relativistic = False
         self.threshold = args.threshold
         self.extract_scf_data()
+        self.get_symmetry_data()
 
     def extract_scf_data(self):
         """
@@ -98,8 +102,9 @@ class RsptData:
         Author:
             Anders Bergman
         """
-        types = []
+        # print(50 * "-")
         scf_moments = []
+        species = []
         # Check if the SCF file is provided and if the
         # calculation is relativistic or not
         # Extract lattice and moments from the SCF file
@@ -108,32 +113,42 @@ class RsptData:
             # print(f"Is the calculation relativistic? {self.is_relativistic}")
 
             self.alat, self.lattice = extract_lattice_scf(self.scf_file)
-            print("SCF lattice matrix: [alat]")
+            print("Input lattice matrix: [alat]")
             for row in self.lattice:
                 print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
-            print(f"SCF lattice constant [a.u.]:\n  {self.alat}")
+            print(f"Input lattice constant [a.u.]:\n  {self.alat}")
 
             scf_moments = extract_moments_scf(self.scf_file, self.is_relativistic)
 
         # Extract basis vectors from the data file
         if self.data_file:
-            types, self.basis = extract_position_data(self.data_file)
-            self.atoms = range(0, len(types))
-            print("`data` basis vectors: (crystal)")
+            self.types, self.basis, species = extract_position_data(self.data_file)
+            self.atoms = range(0, len(self.types))
+            print("Input basis vectors: (crystal)")
             for row in self.basis:
                 print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
 
         # Extract moments from the SCF file
         if self.scf_file and self.data_file:
             self.moments = []
-            for atom in types:
+            self.species = []
+            for atom in self.types:
                 # print(f"Atom type: {atom}")
                 self.moments.append(scf_moments[atom - 1].tolist())
+                self.species.append(species[atom - 1])
+
+            # Print species
+            print(f"Input species list: {self.species}")
+
+            # Print moments
+            total_moments = np.array([mom[2] for mom in self.moments])
             print("SCF magnetic moments: [mu_B/atom] ")
-            print([mom[2] for mom in self.moments])
+            print(total_moments)
 
             # Filter out moments with magnitude below the threshold
-            print(f"Moment threshold: {self.threshold}")
+            print(
+                f"Moment threshold: {self.threshold} : {total_moments>=self.threshold}"
+            )
             tmp_moments = []
             tmp_basis = []
             tmp_atoms = []
@@ -286,6 +301,31 @@ class RsptData:
         # Save the output to the file
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(output)
+
+    def get_symmetry_data(self):
+        """
+        Get the symmetry data of the system.
+
+        This method uses the spglib library to calculate the symmetry data
+        of the system.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+        print(50 * "-")
+        # cell = (self.lattice, self.basis, self.species)
+        cell = (self.lattice, self.basis, self.species, self.moments)
+        # Get the symmetry data
+        symmetry_data = spg.get_symmetry_dataset(cell=cell)
+        # Print the symmetry data
+        print("Space group number: ", symmetry_data.number)
+        print("Space group symbol: ", symmetry_data.international)
+        print("Hall group: ", symmetry_data.hall)
+        print("Number of symmetry operations: ", len(symmetry_data.rotations))
+        print(50 * "-")
 
 
 if __name__ == "__main__":

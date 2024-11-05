@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "rspt-extractor"
-version = "0.3.0"
+version = "0.4.0"
 description = "Tools to extract data from RSPt calculations"
 readme = "README.md"
 authors = [
@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.21",
+   "spglib>=1.16",
 ]
 
 [project.urls]

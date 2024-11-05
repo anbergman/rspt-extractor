@@ -389,6 +389,7 @@ def extract_position_data(filename):
     """
     types = []
     positions = []
+    species = []
     ntype = 0
     with open(filename, "r", encoding="utf-8") as file:
         lines = file.readlines()
@@ -406,8 +407,10 @@ def extract_position_data(filename):
                         [float(val) for val in lines[i + 1 + iatom].split()[0:3]]
                     )
                     types.append(ntype)
+            elif "species" in line:
+                species.append(int(re.sub(r"\D.*", "", line.split()[-1])))
 
-    return types, positions
+    return types, positions, species
 
 
 def extract_exchange_matrices(file_path):
