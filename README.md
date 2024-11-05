@@ -126,3 +126,20 @@ Thresholding the output can be done by either moment magnitude or cutoff radius.
 ```syntax
 rspt-parser --data data --scf out_last --exchange Jij*/out --cutoff 3.0 --threshold 0.5
 ```
+
+## Output files
+
+After a successful run, `rspt-parser` should create the following set of files:
+
+- `inpsd.minimal`: A template `inpsd.dat` file containing minimal needed information
+- `posfile`: Positions in the unit cells for the included atoms
+- `momfile`: Moment magnitudes for the included atoms in the unit cell
+- `jfile`: Scalar representation of Jij exchange interactions
+
+For relativistic workflows the additional files are also included:
+
+- `dmfile`: Dzyaloshinskii-Moriya interactions (DMI) in vector form
+- `cfile`: Symmetric anisotropic exchange interactions (SAI) (non-diagonal only)
+- `jfile.tensor`: Full tensor containing Jij, DMI, and SAI for all interactions.
+
+All files follows the conventions for `UppASD` inputs.
