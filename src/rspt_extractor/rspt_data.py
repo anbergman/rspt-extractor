@@ -1,5 +1,5 @@
 """
-This module contains a class, RsptScf, which is used for extracting and processing
+This module contains a class, RsptData, which is used for extracting and processing
 data from RSPt calculations.
 The class provides methods for extracting exchange data from an input file,
 processing the extracted data, and saving the processed data to an output file.
@@ -9,13 +9,13 @@ import importlib.resources
 import numpy as np
 from .rspt_extract import (
     check_relativistic,
-    extract_moments,
-    extract_basis_vectors,
-    extract_bravais_lattice_matrix,
+    extract_moments_scf,
+    extract_position_data,
+    extract_lattice_scf,
 )
 
 
-class RsptScf:
+class RsptData:
     """
     A class to handle RSPT SCF data extraction and file generation.
 
@@ -62,11 +62,14 @@ class RsptScf:
 
         Author: Anders Bergman
         """
-        self.file_name = args.scf
+        self.scf_file = args.scf
+        self.data_file = args.data
         self.alat = None
         self.lattice = None
         self.basis = None
         self.moments = None
+        self.atoms = None
+        self.filter_list = []
         self.is_relativistic = False
         self.threshold = args.threshold
         self.extract_scf_data()
@@ -95,34 +98,55 @@ class RsptScf:
         Author:
             Anders Bergman
         """
-        self.is_relativistic = check_relativistic(self.file_name)
-        print(f"Is the calculation relativistic? {self.is_relativistic}")
+        types = []
+        scf_moments = []
+        # Check if the SCF file is provided and if the
+        # calculation is relativistic or not
+        # Extract lattice and moments from the SCF file
+        if self.scf_file:
+            self.is_relativistic = check_relativistic(self.scf_file)
+            print(f"Is the calculation relativistic? {self.is_relativistic}")
 
-        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_name)
-        print(f"SCF lattice matrix: {self.lattice}")
-        print(f"SCF lattice constant: {self.alat}")
+            self.alat, self.lattice = extract_lattice_scf(self.scf_file)
+            print(f"SCF lattice matrix: {self.lattice}")
+            print(f"SCF lattice constant: {self.alat}")
 
-        self.basis = extract_basis_vectors(self.file_name)
-        print(f"SCF basis vectors: {self.basis}")
+            scf_moments = extract_moments_scf(self.scf_file, self.is_relativistic)
 
-        self.moments = extract_moments(self.file_name, self.is_relativistic)
-        print("SCF magnetic moments:")
-        print(self.moments)
+        # Extract basis vectors from the data file
+        if self.data_file:
+            types, self.basis = extract_position_data(self.data_file)
+            self.atoms = range(0, len(types))
+            print(f"data basis vectors: {self.basis}")
 
-        # Filter out moments with magnitude below the threshold
-        print(f"Moment threshold: {self.threshold}")
-        tmp_moments = []
-        tmp_basis = []
-        for i, moment in enumerate(self.moments):
-            # Check total (mS+mL) moment
-            if np.abs(moment[2]) >= self.threshold:
-                tmp_moments.append(moment)
-                tmp_basis.append(self.basis[i])
+        # Extract moments from the SCF file
+        if self.scf_file and self.data_file:
+            self.moments = []
+            for atom in types:
+                # print(f"Atom type: {atom}")
+                self.moments.append(scf_moments[atom - 1].tolist())
+            print("SCF magnetic moments:")
+            print([mom[2] for mom in self.moments])
 
-        self.moments = np.array(tmp_moments)
-        self.basis = np.array(tmp_basis)
-        del tmp_moments
-        del tmp_basis
+            # Filter out moments with magnitude below the threshold
+            print(f"Moment threshold: {self.threshold}")
+            tmp_moments = []
+            tmp_basis = []
+            tmp_atoms = []
+            for i, moment in enumerate(self.moments):
+                # Check total (mS+mL) moment
+                if np.abs(moment[2]) >= self.threshold:
+                    tmp_moments.append(moment)
+                    tmp_basis.append(self.basis[i])
+                    tmp_atoms.append(self.atoms[i])
+                    self.filter_list.append(i + 1)
+
+            self.moments = np.array(tmp_moments)
+            self.basis = np.array(tmp_basis)
+            self.atoms = np.array(tmp_atoms)
+            del tmp_moments
+            del tmp_basis
+            del tmp_atoms
 
     def print_lattice(self, output_path):
         """
@@ -263,7 +287,7 @@ class RsptScf:
 if __name__ == "__main__":
     # Example usage
     FILE_PATH = "spin-001/out-scf"
-    rspt_exchange = RsptScf(FILE_PATH)
+    rspt_exchange = RsptData(FILE_PATH)
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")
     rspt_exchange.print_moments("momfile")

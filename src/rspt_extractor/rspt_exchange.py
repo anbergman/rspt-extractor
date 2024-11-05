@@ -18,11 +18,11 @@ Author:
 import numpy as np
 from .rspt_extract import (
     check_relativistic,
-    extract_bravais_lattice_matrix,
+    extract_lattice_scf,
     extract_exchange_matrices,
     extract_exchange_scalars,
     extract_distance_vectors,
-    extract_basis_vectors,
+    extract_basis_scf,
     convert_to_maptype_three,
     convert_to_direct,
     transform_matrix,
@@ -151,13 +151,13 @@ class RsptExchange:
         Author: Anders Bergman
         """
         self.is_relativistic = check_relativistic(self.file_name)
-        print(f"Is the calculation relativistic? {self.is_relativistic}")
+        # print(f"Is the calculation relativistic? {self.is_relativistic}")
 
         # Extracts the Bravais lattice matrix and lattice constant
-        self.alat, self.lattice = extract_bravais_lattice_matrix(self.file_name)
+        self.alat, self.lattice = extract_lattice_scf(self.file_name)
 
         # Extract basis vectors
-        self.basis = extract_basis_vectors(self.file_name)
+        self.basis = extract_basis_scf(self.file_name)
 
         if self.is_relativistic:
             # Extracts the exchange matrices (J, D, A)
@@ -174,7 +174,6 @@ class RsptExchange:
             self.r_ij,
         ) = extract_distance_vectors(self.file_name)
 
-        print("Exchange matrices:")
         # print(self.r_ij)
         # Convert to map type
         if self.maptype == "3" or self.maptype == "2":
@@ -225,7 +224,6 @@ class RsptExchange:
                 ]
                 outmap.append(flatten_and_concatenate(i_list))
         else:
-            print(len(self.r_ij))
             for idx, _ in enumerate(self.r_ij):
                 i_list = [
                     self.i_atom,
@@ -335,13 +333,13 @@ def downscale_exchange(exchange, mask_list=None):
 
     Returns:
         np.ndarray: A numpy array of the downscaled exchange matrix with dtype
-        np.float32.
+        np.float64.
 
     Author:
         Anders Bergman
     """
     if not mask_list:
-        return np.array(exchange, dtype=np.float32)
+        return np.array(exchange, dtype=np.float64)
     else:
         masked_data = []
         for row in exchange:
@@ -351,7 +349,7 @@ def downscale_exchange(exchange, mask_list=None):
                 new_row[1] = mask_list.index(row[1]) + 1
                 masked_data.append(new_row)
 
-        return np.array(masked_data, dtype=np.float32)
+        return np.array(masked_data, dtype=np.float64)
 
 
 def extract_projections(exchange, is_relativistic=True):
@@ -411,7 +409,7 @@ def extract_projections(exchange, is_relativistic=True):
     return j_dict
 
 
-def print_projections(j_dict, maptype="C", is_relativistic=True):
+def print_projections(j_dict, maptype="C", is_relativistic=True, cutoff=None):
     """
     Save projections from a dictionary to files with specific formatting.
 
@@ -448,7 +446,7 @@ def print_projections(j_dict, maptype="C", is_relativistic=True):
         Anders Bergman
     """
     if maptype == "C" or maptype == "D":
-        fmt_l = "%4d %4d   % 12.8f % 12.8f % 12.8f   "
+        fmt_l = "%4d %4d   % 10.6f % 10.6f % 10.6f   "
     else:
         fmt_l = "%4d %4d   % 4.1f % 4.1f % 4.1f    "
     fmt_1 = "% 10.6f"
@@ -466,9 +464,11 @@ def print_projections(j_dict, maptype="C", is_relativistic=True):
         fmts = [fmt_1, fmt_9]
 
     for idx, key in enumerate(keys):
-        outmat = np.hstack((j_dict["left"], j_dict[key], j_dict["right"]))
-        print(key, outmat.shape)
-        print(outmat[0])
+        outmat = np.hstack(
+            (j_dict["left"], j_dict[key], j_dict["right"]), dtype=np.float64
+        )
+        if cutoff:
+            outmat = outmat[outmat[:, -1] <= cutoff]
         fname = fnames[idx]
         np.savetxt(fname, outmat, fmt=fmt_l + fmts[idx] + fmt_r)
     print("Projections saved to files.")

@@ -11,11 +11,11 @@ Functions:
 
     transform_matrix(matrix: np.ndarray) -> np.ndarray:
 
-    extract_bravais_lattice_matrix(file_path: str) -> tuple:
+    extract_lattice_scf(file_path: str) -> tuple:
 
-    extract_moments(file_path: str) -> np.ndarray:
+    extract_moments_scf(file_path: str) -> np.ndarray:
 
-    extract_basis_vectors(file_path: str) -> np.ndarray:
+    extract_basis_scf(file_path: str) -> np.ndarray:
 
     extract_distance_vectors(file_path: str) -> tuple:
 
@@ -128,7 +128,7 @@ def check_relativistic(file_name):
     Example:
         >>> is_relativistic = check_relativistic("path/to/file.txt")
         >>> print(is_relativistic)
-     """
+    """
     with open(file_name, "r", encoding="utf-8") as file:
         lines = file.readlines()
 
@@ -139,7 +139,7 @@ def check_relativistic(file_name):
     return False
 
 
-def extract_bravais_lattice_matrix(file_name):
+def extract_lattice_scf(file_name):
     """
     Extracts the Bravais lattice matrix from a given file.
 
@@ -182,7 +182,7 @@ def extract_bravais_lattice_matrix(file_name):
     for line in lines:
         if "Bravais lattice basis" in line:
             capture = True
-            alat = np.float32(line.split()[4])
+            alat = np.float64(line.split()[4])
             continue  # Skip the line containing 'Bravais lattice basis'
         if capture:
             # Check if the line has three floating point numbers
@@ -197,7 +197,7 @@ def extract_bravais_lattice_matrix(file_name):
     return alat, np.array(matrix)
 
 
-def extract_moments(file_name, is_relativistic):
+def extract_moments_scf(file_name, is_relativistic):
     """
     Extracts magnetic moments from a specified file.
 
@@ -267,10 +267,10 @@ def extract_moments(file_name, is_relativistic):
                     continue
                 moments.append([float(values[1]), 0.0, float(values[1])])
 
-    return np.array(moments, dtype=np.float32)
+    return np.array(moments, dtype=np.float64)
 
 
-def extract_basis_vectors(file_name):
+def extract_basis_scf(file_name):
     """
     Extracts basis vectors from a file.
 
@@ -308,7 +308,7 @@ def extract_basis_vectors(file_name):
             # vectors.append([float(val) for val in values[0:3]])
             capture = False
 
-    return np.array(vectors, dtype=np.float32)
+    return np.array(vectors, dtype=np.float64)
 
 
 def extract_distance_vectors(file_path):
@@ -346,7 +346,7 @@ def extract_distance_vectors(file_path):
         if "Central" in line:
             capture_glob = True
             i_atom = np.int32(line.split()[1])
-            r_i = np.array(line.split()[5:8], dtype=np.float32)
+            r_i = np.array(line.split()[5:8], dtype=np.float64)
             continue
 
         if "END" in line:
@@ -354,11 +354,59 @@ def extract_distance_vectors(file_path):
 
         if capture_glob:
             values = line.split()
-            r_ij.append(np.array(values[5:8], dtype=np.float32))
-            d_ij.append(np.float32(values[10]))
+            r_ij.append(np.array(values[5:8], dtype=np.float64))
+            d_ij.append(np.float64(values[10]))
             j_atom.append(np.int32(values[1]))
 
     return i_atom, r_i, j_atom, d_ij, r_ij
+
+
+def extract_position_data(filename):
+    """
+    Reads RSPt data from a given file and extracts atom types and positions.
+
+    This function parses a file to extract the number of atoms and their
+    positions. It looks for specific keywords ('natom' and 'tau1') to identify
+    the relevant sections of the file. The positions are extracted as a list
+    of coordinates, and the types are assigned based on the order of appearance.
+
+    Args:
+        filename (str): The path to the file containing RSPT data.
+
+    Returns:
+        Tuple[List[int], List[List[float]]]: A tuple containing two lists:
+            - types: A list of integers representing the type of each atom.
+            - positions: A list of lists, where each sublist contains three
+              floats representing the x, y, and z coordinates of an atom.
+
+    Raises:
+        ValueError: If the file format is incorrect or if 'natom' is not found
+                    before 'tau1'.
+
+    Author:
+        Anders Bergman
+    """
+    types = []
+    positions = []
+    ntype = 0
+    with open(filename, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+        for i, line in enumerate(lines):
+            # Look for the line containing 'natom'
+            if "natom" in line:
+                # The value is in the line below, first column
+                natom = int(lines[i + 1].split()[0])
+                ntype += 1
+            elif "tau1" in line:
+                for iatom in range(natom):
+                    # The positions are in the lines below,
+                    # starting from the line after 'tau1'
+                    positions.append(
+                        [float(val) for val in lines[i + 1 + iatom].split()[0:3]]
+                    )
+                    types.append(ntype)
+
+    return types, positions
 
 
 def extract_exchange_matrices(file_path):
@@ -500,7 +548,7 @@ def convert_to_maptype_three(j_atoms, basis, lattice, alat, r_ij):
         v_ij = r_shift - r_j  # - r_i
         s_ij.append(np.dot(invlatt, v_ij))
 
-    return np.array(s_ij, dtype=np.float32).round(4)
+    return np.array(s_ij, dtype=np.float64).round(4)
 
 
 def convert_to_direct(basis, lattice, alat, r_ij):
@@ -531,4 +579,4 @@ def convert_to_direct(basis, lattice, alat, r_ij):
         r_shift = vector / alat
         s_ij.append(np.dot(invlatt, r_shift))
 
-    return np.array(s_ij, dtype=np.float32).round(4)
+    return np.array(s_ij, dtype=np.float64).round(4)

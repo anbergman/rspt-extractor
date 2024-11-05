@@ -4,7 +4,7 @@ and functions from submodules.
 
 
 Imports:
-    RsptScf (rspt_scf): Class for handling RSPT self-consistent field (SCF)
+    RsptData (rspt_data): Class for handling RSPT self-consistent field (SCF)
         calculations.
     RsptExchange (rspt_exchange): Class for handling RSPT exchange
         calculations.
@@ -19,15 +19,17 @@ Author:
     Anders Bergman
 """
 
-from .rspt_scf import RsptScf
+from .rspt_data import RsptData
 from .rspt_exchange import RsptExchange
 from .rspt_exchange import downscale_exchange, extract_projections, print_projections
+from .rspt_extract import extract_position_data
 
 __all__ = [
-    "RsptScf",
+    "RsptData",
     "RsptExchange",
     "RsptExchange",
     "downscale_exchange",
     "extract_projections",
     "print_projections",
+    "extract_position_data",
 ]
