@@ -91,10 +91,38 @@ where `--rx`, `--ry`, and `--rz` controls where the Jij output files are fund. N
 
 *NOTE:* The relativistic workflow is not guaranteed to work due to the risk of uncontrolled reshuffeling of atoms between the different spin-axis calculations. A fix for this is pending for the `RSPt` code.
 
-## Additional flags
+## YFe2
 
-Thresholding the output can be done by either moment magnitude or cutoff radius. To only extract the Fe atoms in the `FePt` example above we can add the `--threshold 0.5` which will filter out all atoms with a magnetic moment lower than $0.5 \mu_B$. To enforce a cutoff radius, the flag `--cutoff 3.0` can be included to truncate the exchange interactions to only include interactions within $3.0$ lattice parameters. Example:
+For scalar exchange interactions, an example can be found in the `examples/YFe2` folder. Here the file structure is as follows:
+
+```bash
+YFe2
+├── Jij-01
+│   └── out
+├── Jij-02
+│   └── out
+├── Jij-03
+│   └── out
+├── Jij-04
+│   └── out
+├── Jij-05
+│   └── out
+├── Jij-06
+│   └── out
+├── data
+└── out_last
+```
+
+i.e. each atom has its Jij output files in a separate directory while the SCF output file (here `out_last`) and the `data` file are located in the root folder. For scalar exchange, the relevant flag is `--exchange` and the extraction of exchange parameters for this system would then be
 
 ```syntax
-rspt-parser --scf spin-001/out-scf --data spin-001/data --rx spin-100/out-? --ry spin-010/out-? --rz spin-001/out-? --threshold 0.5 --cutoff 3.0
+rspt-parser --data data --scf out_last --exchange Jij*/out
+```
+
+## Additional flags
+
+Thresholding the output can be done by either moment magnitude or cutoff radius. To only extract the Fe atoms in the `YFe2` example above we can add the `--threshold 0.5` which will filter out all atoms with a magnetic moment lower than $0.5 \mu_B$. To enforce a cutoff radius, the flag `--cutoff 3.0` can be included to truncate the exchange interactions to only include interactions within $3.0$ lattice parameters. Example:
+
+```syntax
+rspt-parser --data data --scf out_last --exchange Jij*/out --cutoff 3.0 --threshold 0.5
 ```
