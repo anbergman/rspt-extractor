@@ -1,6 +1,6 @@
 # RSPt Extractor
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 **Author:** Anders Bergman
 
 ## Overview
@@ -25,30 +25,76 @@ pip install -e .
 
 ## Usage
 
-The classes included in the package can be customized to your preferred directory structure. Assuming the default structure for relativistic calculations i.e. three folders named `spin-001`, `spin-010`, and `spin-100`, then the built-in script `rspt-runner` can be invoked as
+The classes included in the package can be customized to your preferred directory structure with the suitable flags. Files needed from an `RSPt` calculation are the following:
+
+- `data`: `RSPt` structure input file. Needed for positions of atoms.
+- `out.scf` (arbitrary name): Terminal output from `RSPt` SCF calculation. Needed for magnetic moments.
+- `out.jij` (arbitrary name): Terminal output from `RSPt` Jij calculation. Needed for extraction of exchange interactions and neighbour information.
+
+To allow for flexible naming and placing of these files, all inputs are given as flags to the parser. Thus, assuming the naming convention above, and a single Jij output file, the syntax would be
 
 ```bash
-rspt-runner
+rspt-parser --data data --scf out.scf --exchange out.jij
 ```
 
-This should work for the included examples.
+to extract the calculated exchange interactions.
 
-## Options
+## Flags
 
-While the package can be customized to your own needs, the default script `rspt-runner` comes with a number of flags to allow more user control. The flags are visible by `rspt-runner --help` and are currently as follows
+While the package can be customized to your own needs, the default script `rspt-extractor` comes with a number of flags to allow more user control. The flags are visible by `rspt-extractor --help` and are currently as follows
 
 ```syntax
 RSPt exchange extraction tool
 
 options:
   -h, --help            show this help message and exit
-  -s SCF_PATH, --scf SCF_PATH     Run SCF workflow with the given SCF_PATH
-  -e XC_PATH, --exchange XC_PATH
-                        Run exchange workflow with the given XC_PATH
-  -r DIRX DIRY DIRZ, --run DIRX DIRY DIRZ
-                        Run default workflow with directories DIRX DIRY DIRZ
+  -d DATA, --data DATA  FILE_NAME for RSPt input data
+  -s SCF, --scf SCF     FILE_NAME for RSPt SCF output data
+  -e FILE_NAME [FILE_NAME ...], --exchange FILE_NAME [FILE_NAME ...]
+                        Run exchange workflow for the given FILE_NAMEs
+  --rx FILE_NAME [FILE_NAME ...]
+                        Input files for relativistic exchange workflow (x-direction)
+  --ry FILE_NAME [FILE_NAME ...]
+                        Input files for relativistic exchange workflow (y-direction)
+  --rz FILE_NAME [FILE_NAME ...]
+                        Input files for relativistic exchange workflow (z-direction)
   -m MAPTYPE, --maptype MAPTYPE
                         Output maptype: (C)artesian, (D)irect or maptype (3)
   -a ATOMS [ATOMS ...], --atoms ATOMS [ATOMS ...]
-                        List of atoms to extract exchange interactions for. Default all.
+                        List of atoms to extract exchange interactions for
+  -t THRESHOLD, --threshold THRESHOLD
+                        Threshold for moment magnitudes. Default is 0.0
+  -c CUTOFF, --cutoff CUTOFF
+                        Radius for excange interaction cutoff
+```
+
+## Included examples
+
+### FePt
+
+An example for relativistic exchange interaction extraction can be found in the folder `examples/FePt`. For relativistic interactions, *three* different calculations with different spin axes are needed. In this example the calculations are grouped within the following folder structure
+
+```bash
+├── FePt
+│   ├── spin-001
+│   ├── spin-010
+│   └── spin-100
+```
+
+with the output files from both SCF and Jij calculations available in each subfolder. To extract the relativistic exchange interactions the syntax for this example should be
+
+```syntax
+rspt-parser --scf spin-001/out-scf --data spin-001/data --rx spin-100/out-? --ry spin-010/out-? --rz spin-001/out-?
+```
+
+where `--rx`, `--ry`, and `--rz` controls where the Jij output files are fund. Notice the wild-carding since there are several Jij output files in each directory.
+
+*NOTE:* The relativistic workflow is not guaranteed to work due to the risk of uncontrolled reshuffeling of atoms between the different spin-axis calculations. A fix for this is pending for the `RSPt` code.
+
+## Additional flags
+
+Thresholding the output can be done by either moment magnitude or cutoff radius. To only extract the Fe atoms in the `FePt` example above we can add the `--threshold 0.5` which will filter out all atoms with a magnetic moment lower than $0.5 \mu_B$. To enforce a cutoff radius, the flag `--cutoff 3.0` can be included to truncate the exchange interactions to only include interactions within $3.0$ lattice parameters. Example:
+
+```syntax
+rspt-parser --scf spin-001/out-scf --data spin-001/data --rx spin-100/out-? --ry spin-010/out-? --rz spin-001/out-? --threshold 0.5 --cutoff 3.0
 ```
