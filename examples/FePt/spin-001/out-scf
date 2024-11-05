@@ -9,14 +9,14 @@
  Total MPI tasks:                                  256
                    FFT Configuration
        multi-threaded FFTW3 enabled with            1  threads
- 
+
  Readin: Please, set the env variable RSPT_SCRATCH to point to your scratch directory.
 
 
 
                            RSPT
                         OUTPUT for :
- LABEL                                                          
+ LABEL
       time             date             host
      18.55         04 Oct 2023          nid001256
 
@@ -50,7 +50,7 @@ c fix these
  FFTFFFFFTFFFFFFFFFFFTFTFFFFFFFFTFFFFTFFFFFFFTFFFFFFFFFFFFFFFTFFFFFTTFFFF
 
       Exchange-Correlation function ...
-         Perdew and Wang 1992                                           
+         Perdew and Wang 1992
          with PBE 96 gradient corrections
 
     ntl     .   nes     .     .           .           .   log(epst)
@@ -70,7 +70,7 @@ c fix these
   .000000000000000  1.00000000000000  .000000000000000
   .000000000000000  .000000000000000  1.01626016260162
 
- unit cell volume: 
+ unit cell volume:
        .984000000000000 * 7.28489410**3
        .234912696003637 * 7.28489410**3 * 4pi/3
 
@@ -338,7 +338,7 @@ c fix these
  Valence Basis Functions.
         Bases    MD    EV
            48   240   172
-        t  a  l  e     tail         
+        t  a  l  e     tail
         1  1  0  1        1
         1  1  0  1        2
         1  1  0  1        3
@@ -1081,7 +1081,7 @@ c fix these
                0.0000         0.0010         0.0026         0.1412
   setbex1 =            8
   setbex1 =           10
- Fourier transform parameters 
+ Fourier transform parameters
  radii and arguments:
  2.0599171     6
  2.4475406     6
@@ -2231,18 +2231,18 @@ c fix these
  Energy Vector
                    Eigenvalue sums
          Valence : -0.10707586821131E+03         -107.075 868 211 3
-            Core : -0.48161481466907E+05      -48,161.481 466 907  
+            Core : -0.48161481466907E+05      -48,161.481 466 907
                    Coulomb Energy
- n(vc/2-vin)  mt : -0.28647937474929E+05      -28,647.937 474 928  
+ n(vc/2-vin)  mt : -0.28647937474929E+05      -28,647.937 474 928
  n(vc/2-vin) int :  0.60789561699292E+01            6.078 956 169 9
         -zv(0)/2 : -0.31484298250631E+03         -314.842 982 506 3
-           Total : -0.28956701501265E+05      -28,956.701 501 265  
+           Total : -0.28956701501265E+05      -28,956.701 501 265
                    Exchange/Correlation
        n*exc int : -0.41602538376838E+01           -4.160 253 837 6
        n*exc  mt : -0.16491041098824E+04       -1,649.104 109 882 4
            Total : -0.16532643637201E+04       -1,653.264 363 720 0
                    Total Energy
-               E : -0.78878523200104E+05      -78,878.523 200 103  
+               E : -0.78878523200104E+05      -78,878.523 200 103
  Entropy correction:
        T    =  789.466932
        S    =  .606630572338142
@@ -2555,4 +2555,3 @@ c fix these
              Total          Cholesky
 
             .01574            .00181
-
