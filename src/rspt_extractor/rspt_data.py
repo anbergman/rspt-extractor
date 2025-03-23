@@ -11,6 +11,7 @@ import spglib as spg
 from .rspt_extract import (
     check_relativistic,
     extract_moments_scf,
+    extract_position_scf,
     extract_position_data,
     extract_lattice_scf,
 )
@@ -38,7 +39,7 @@ class RsptData:
             Print the basis vectors to an UppASD posfile.
         print_moments(output_path):
             Print the magnetic moments to an UppASD posfile.
-        print_template(posfile, momfile, exchange, file_path):
+        print_template(posfile, momfile, exchange, file_path, mtype):
 
     Author: Anders Bergman
     """
@@ -75,6 +76,7 @@ class RsptData:
         self.filter_list = []
         self.is_relativistic = False
         self.threshold = args.threshold
+        self.bohr_to_angstrom = 0.529177249
         self.extract_scf_data()
         self.get_symmetry_data()
 
@@ -117,19 +119,32 @@ class RsptData:
             for row in self.lattice:
                 print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
             print(f"Input lattice constant [a.u.]:\n  {self.alat}")
-
+            alat_angstrom = self.alat * 0.529177
+            print(f"Input lattice constant [Å]:\n  {alat_angstrom}")
             scf_moments = extract_moments_scf(self.scf_file, self.is_relativistic)
 
         # Extract basis vectors from the data file
-        if self.data_file:
-            self.types, self.basis, species = extract_position_data(self.data_file)
+        if self.scf_file:
+            self.types, self.basis, species = extract_position_scf(self.scf_file)
             self.atoms = range(0, len(self.types))
+            # Ensure all basis vectors are within 0 < x < 1
+            # self.basis = np.mod(self.basis, 1.0)
             print("Input basis vectors: (crystal)")
             for row in self.basis:
                 print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
 
+        # # Extract basis vectors from the data file
+        elif self.data_file:
+            self.types, self.basis, species = extract_position_data(self.data_file)
+            self.atoms = range(0, len(self.types))
+            # Ensure all basis vectors are within 0 < x < 1
+            # self.basis = np.mod(self.basis, 1.0)
+            print("Input basis vectors: (crystal)")
+            for row in self.basis:
+                print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
         # Extract moments from the SCF file
-        if self.scf_file and self.data_file:
+        # if self.scf_file and self.data_file:
+        if self.scf_file:
             self.moments = []
             self.species = []
             for atom in self.types:
@@ -248,7 +263,7 @@ class RsptData:
             fmt="%4d %4d   % 10.6f   % 10.6f % 10.6f % 10.6f",
         )
 
-    def print_template(self, posfile, momfile, exchange, file_path):
+    def print_template(self, posfile, momfile, exchange, file_path, mtype):
         """
         Generates and writes a formatted output file based on a template and
         provided parameters.
@@ -270,6 +285,16 @@ class RsptData:
 
         Author: Anders Bergman
         """
+        # Digest proper maptype and posfiletype from mtype
+        if mtype == "3":
+            maptype = "3"
+            posfiletype = "D"
+        elif mtype == "D":
+            maptype = "1"
+            posfiletype = "D"
+        elif mtype == "C":
+            maptype = "1"
+            posfiletype = "C"
         # Create a dictionary with all placeholders and their values
         template_values = {
             "cell_00": self.lattice[0][0],
@@ -284,6 +309,9 @@ class RsptData:
             "posfile": posfile,
             "momfile": momfile,
             "exchange": exchange,
+            "maptype": maptype,
+            "posfiletype": posfiletype,
+            "alat": self.alat * self.bohr_to_angstrom * 1.0e-10,
         }
 
         # Read the template from the package using importlib.resources
@@ -317,6 +345,16 @@ class RsptData:
         """
         print(50 * "-")
         # cell = (self.lattice, self.basis, self.species)
+        print("Lattice matrix:")
+        for row in self.lattice:
+            print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
+        print("Basis vectors:")
+        for row in self.basis:
+            print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
+        print("Species: ", self.species)
+        # print("Magnetic moments:")
+        # print(self.moments)
+
         cell = (self.lattice, self.basis, self.species, self.moments)
         # Get the symmetry data
         symmetry_data = spg.get_symmetry_dataset(cell=cell)
@@ -335,4 +373,4 @@ if __name__ == "__main__":
     rspt_exchange.print_lattice("lattice.dat")
     rspt_exchange.print_positions("posfile")
     rspt_exchange.print_moments("momfile")
-    rspt_exchange.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+    rspt_exchange.print_template("posfile", "momfile", "jfile", "inpsd.dat", mtype="3")

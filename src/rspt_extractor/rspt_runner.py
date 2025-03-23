@@ -41,6 +41,7 @@ Attributes:
 """
 
 import argparse
+import locale
 import numpy as np
 from rspt_extractor import (
     RsptData,
@@ -68,7 +69,7 @@ def rspt_get_scf_data(args):
         lattice.dat: File containing lattice information.
         posfile: File containing atomic positions.
         momfile: File containing magnetic moments.
-        inpsd.minimal: Template file for further calculations.
+        inpsd.dat: Template file for further calculations.
 
     Author:
         Anders Bergman
@@ -80,7 +81,9 @@ def rspt_get_scf_data(args):
         rspt_data.print_positions("posfile")
     if rspt_data.data_file and rspt_data.scf_file:
         rspt_data.print_moments("momfile")
-    rspt_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+    rspt_data.print_template(
+        "posfile", "momfile", "jfile", "inpsd.dat", mtype=args.maptype
+    )
 
 
 def rspt_get_input_data(args):
@@ -90,7 +93,7 @@ def rspt_get_input_data(args):
     Author:
         Anders Bergman
     """
-    types, pos = extract_position_data(args.data)
+    types, pos, _ = extract_position_data(args.data)
     return types, pos
 
 
@@ -202,7 +205,9 @@ def rspt_relativistic_workflow(args):
         scf_data.print_lattice("lattice.dat")
         scf_data.print_positions("posfile")
         scf_data.print_moments("momfile")
-        scf_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
+        scf_data.print_template(
+            "posfile", "momfile", "jfile", "inpsd.dat", mtype=args.maptype
+        )
     else:
         print(
             "No SCF and/or `data` file provided, full `UppASD` template not generated."
@@ -251,6 +256,13 @@ def rspt_scalar_workflow(args):
     print(50 * "-")
     print("Scalar exchange workflow")
 
+    # Extract information from the SCF and exchange files for lattice scaling
+    if args.scf:
+        scf_data = RsptData(args)
+        scale = scf_data.alat
+    else:
+        scale = 1.0
+
     # Process the exchange interactions
     input_files = args.exchange
     atomlist = args.atoms
@@ -258,7 +270,7 @@ def rspt_scalar_workflow(args):
     exchange_data = []
 
     for file_name in input_files:
-        extracted_data = RsptExchange(file_name, args.maptype)
+        extracted_data = RsptExchange(file_name, maptype=args.maptype, scale=scale)
         exchange_list.append(extracted_data)
         exchange_data.append(extracted_data.outmap)
 
@@ -285,21 +297,24 @@ def rspt_scalar_workflow(args):
 
     # Exctract data from an scf-run
     print("-" * 50)
-    if args.scf and args.data:
-        scf_data = RsptData(args)
+
+    if args.scf:
+        # Overwrite the lattice with the one from the exchange data
+        # if maptype is cartesian
+        if args.maptype == "C":
+            scf_data.lattice = exchange_list[0].lattice * exchange_list[0].alat
+            scf_data.basis = np.dot(scf_data.basis, scf_data.lattice)
+            scf_data.alat = 1.0
+
         # Print the lattice, basis, and moments information
         scf_data.print_lattice("lattice.dat")
         scf_data.print_positions("posfile")
         scf_data.print_moments("momfile")
-        scf_data.print_template("posfile", "momfile", "jfile", "inpsd.minimal")
-        # lattice = scf_data.lattice
-        # basis = scf_data.basis
-        # moments = scf_data.moments
-        # atoms = scf_data.atoms
+
+        scf_data.print_template(
+            "posfile", "momfile", "jfile", "inpsd.dat", mtype=args.maptype
+        )
     else:
-        # lattice = exchange_list[0].lattice
-        # basis = [obj.r_i for obj in exchange_list]
-        # moments = [1.0 for obj in exchange_list]
         print(
             "No SCF and/or `data` file provided, full `UppASD` template not generated."
         )
@@ -446,4 +461,5 @@ def main():
 
 
 if __name__ == "__main__":
+    locale.setlocale(locale.LC_NUMERIC, "en_US.UTF-8")
     main()

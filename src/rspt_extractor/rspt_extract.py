@@ -195,7 +195,7 @@ def extract_lattice_scf(file_name):
             if len(matrix) == 3:
                 break
 
-    return alat, np.array(matrix)
+    return alat, np.array(matrix).T
 
 
 def extract_moments_scf(file_name, is_relativistic):
@@ -286,12 +286,19 @@ def extract_basis_scf(file_name):
         lines = file.readlines()
 
     vectors = []
+    types = []
+    species = []
+    itype = 0
     capture = False
 
     # Define a regular expression to match floats (including scientific notation)
     float_pattern = r"([+-]?\d+\.\d+E[+-]?\d+)"
 
-    for line in lines:
+    for iline, line in enumerate(lines):
+        if "Type     Z" in line:
+            itype = int(lines[iline + 1].split()[0])
+            dspec = float(lines[iline + 1].split()[1])
+            species.append(int(dspec))
         if "G*t/2pi" in line:
             capture = True
             continue  # Skip the line containing 'Bravais lattice basis'
@@ -307,9 +314,54 @@ def extract_basis_scf(file_name):
 
             vectors.append([float(val) for val in parsed_data])
             # vectors.append([float(val) for val in values[0:3]])
+            # Add species and type to list
+            types.append(itype)
             capture = False
 
-    return np.array(vectors, dtype=np.float64)
+    return np.array(vectors, dtype=np.float64)  # , types, species
+
+
+def extract_position_scf(filename):
+    """
+    Reads RSPt position data from SCF out file
+
+    Args:
+        filename (str): The path to the file containing RSPT data.
+
+    Returns:
+        Tuple[List[int], List[List[float]]]: A tuple containing two lists:
+            - types: A list of integers representing the type of each atom.
+            - positions: A list of lists, where each sublist contains three
+              floats representing the x, y, and z coordinates of an atom.
+
+    Raises:
+        ValueError: If the file format is incorrect or if 'natom' is not found
+                    before 'tau1'.
+
+    Author:
+        Anders Bergman
+    """
+    types = []
+    positions = []
+    species = []
+    with open(filename, "r", encoding="utf-8") as file:
+        lines = file.readlines()
+        for iline, line in enumerate(lines):
+            # Look for the line containing 'natom'
+            if "Type     Z" in line:
+                # The value is in the line below, first column
+                itype = int(lines[iline + 1].split()[0])
+                nsites = int(lines[iline + 1].split()[3])
+                dspec = float(lines[iline + 1].split()[1])
+                species.append(int(dspec))
+            elif "G*t/2pi" in line:
+                for iatom in range(nsites):
+                    # The positions are in the lines below,
+                    parsed_line = re.sub(r"(?<!E)-", " -", lines[iline + 1 + iatom])
+                    positions.append([float(val) for val in parsed_line.split()[0:3]])
+                    types.append(itype)
+
+    return types, positions, species
 
 
 def extract_distance_vectors(file_path):
@@ -342,8 +394,11 @@ def extract_distance_vectors(file_path):
     j_atom = []
     r_ij = []
     capture_glob = False
+    scale = 1.0
 
-    for line in lines:
+    for iline, line in enumerate(lines):
+        if "Bravais lattice basis" in line:
+            scale = np.float32(lines[iline + 1].split()[0])
         if "Central" in line:
             capture_glob = True
             i_atom = np.int32(line.split()[1])
@@ -356,7 +411,7 @@ def extract_distance_vectors(file_path):
         if capture_glob:
             values = line.split()
             r_ij.append(np.array(values[5:8], dtype=np.float64) - r_i)
-            d_ij.append(np.float64(values[10]))
+            d_ij.append(np.float64(values[13]) / scale)
             j_atom.append(np.int32(values[1]))
 
     return i_atom, r_i, j_atom, d_ij, r_ij
@@ -393,18 +448,18 @@ def extract_position_data(filename):
     ntype = 0
     with open(filename, "r", encoding="utf-8") as file:
         lines = file.readlines()
-        for i, line in enumerate(lines):
+        for iline, line in enumerate(lines):
             # Look for the line containing 'natom'
             if "natom" in line:
                 # The value is in the line below, first column
-                natom = int(lines[i + 1].split()[0])
+                natom = int(lines[iline + 1].split()[0])
                 ntype += 1
             elif "tau1" in line:
                 for iatom in range(natom):
                     # The positions are in the lines below,
                     # starting from the line after 'tau1'
                     positions.append(
-                        [float(val) for val in lines[i + 1 + iatom].split()[0:3]]
+                        [float(val) for val in lines[iline + 1 + iatom].split()[0:3]]
                     )
                     types.append(ntype)
             elif "species" in line:
@@ -543,14 +598,13 @@ def convert_to_maptype_three(i_atom, j_atoms, basis, lattice, alat, r_ij):
         Anders Bergman
     """
     invlatt = np.linalg.inv(lattice)
-    # basis[:, 2] = -basis[:, 2]
     s_ij = []
     for idx, vector in enumerate(r_ij):
-        r_i = np.dot(lattice, basis[i_atom - 1])
-        r_j = np.dot(lattice, basis[j_atoms[idx] - 1])
+        r_i = np.dot(lattice.T, basis[i_atom - 1])
+        r_j = np.dot(lattice.T, basis[j_atoms[idx] - 1])
         r_shift = vector / alat
         v_ij = r_shift - (r_j - r_i)
-        s_ij.append(np.dot(invlatt, v_ij))
+        s_ij.append(np.dot(invlatt.T, v_ij))
 
     return np.array(s_ij, dtype=np.float64).round(4)
 

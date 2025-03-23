@@ -22,7 +22,7 @@ from .rspt_extract import (
     extract_exchange_matrices,
     extract_exchange_scalars,
     extract_distance_vectors,
-    extract_basis_scf,
+    extract_position_scf,
     convert_to_maptype_three,
     convert_to_direct,
     transform_matrix,
@@ -76,7 +76,7 @@ class RsptExchange:
         Anders Bergman
     """
 
-    def __init__(self, exchange, maptype="C"):
+    def __init__(self, exchange, maptype="C", scale=1.0):
         """
         This constructor sets up the RsptExchange object by initializing its
         attributes and calling methods to extract and process data from the
@@ -100,6 +100,7 @@ class RsptExchange:
         """
         self.file_name = exchange
         self.maptype = maptype
+        self.scale = scale
         self.is_relativistic = False
         self.alat = None
         self.lattice = []
@@ -155,7 +156,7 @@ class RsptExchange:
         self.alat, self.lattice = extract_lattice_scf(self.file_name)
 
         # Extract basis vectors
-        self.basis = extract_basis_scf(self.file_name)
+        _, self.basis, _ = extract_position_scf(self.file_name)
 
         if self.is_relativistic:
             # Extracts the exchange matrices (J, D, A)
@@ -163,6 +164,7 @@ class RsptExchange:
         else:
             # Exctract scalar exchange couplings
             self.j_ij = extract_exchange_scalars(self.file_name)
+
         # Extract bond info. r_i, r_ij in cartesian coordinates, d_ij = |r_ij|
         (
             self.i_atom,
@@ -172,8 +174,8 @@ class RsptExchange:
             self.r_ij,
         ) = extract_distance_vectors(self.file_name)
 
-        # print(self.r_ij)
         # Convert to map type
+        # self.alat = np.float32(1.0)
         if self.maptype == "3" or self.maptype == "2":
             self.s_ij = convert_to_maptype_three(
                 self.i_atom,
@@ -186,7 +188,7 @@ class RsptExchange:
         elif self.maptype == "D":
             self.s_ij = convert_to_direct(self.lattice, self.alat, self.r_ij)
         elif self.maptype == "C":
-            self.s_ij = self.r_ij / self.alat
+            self.s_ij = self.r_ij  # / self.alat
         else:
             raise ValueError("Invalid maptype specified.")
 
@@ -221,7 +223,7 @@ class RsptExchange:
                     self.j_atoms[idx],
                     self.s_ij[idx],
                     transform_matrix(self.matrices[idx]).flatten(),
-                    self.d_ij[idx] / self.alat,
+                    self.d_ij[idx],
                 ]
                 outmap.append(flatten_and_concatenate(i_list))
         else:
@@ -231,7 +233,7 @@ class RsptExchange:
                     self.j_atoms[idx],
                     self.s_ij[idx],
                     self.j_ij[idx],
-                    self.d_ij[idx] / self.alat,
+                    self.d_ij[idx],
                 ]
                 outmap.append(flatten_and_concatenate(i_list))
         self.outmap = np.array(outmap)
