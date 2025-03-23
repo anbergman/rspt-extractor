@@ -131,7 +131,7 @@ rspt-parser --data data --scf out_last --exchange Jij*/out --cutoff 3.0 --thresh
 
 After a successful run, `rspt-parser` should create the following set of files:
 
-- `inpsd.minimal`: A template `inpsd.dat` file containing minimal needed information
+- `inpsd.dat`: A template UppASD input file containing minimal needed information
 - `posfile`: Positions in the unit cells for the included atoms
 - `momfile`: Moment magnitudes for the included atoms in the unit cell
 - `jfile`: Scalar representation of Jij exchange interactions
