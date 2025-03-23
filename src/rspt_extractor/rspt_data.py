@@ -175,8 +175,11 @@ class RsptData:
                     tmp_atoms.append(self.atoms[i])
                     self.filter_list.append(i + 1)
 
+            self.full_moments = np.array(self.moments)
             self.moments = np.array(tmp_moments)
+            self.full_basis = np.array(self.basis)
             self.basis = np.array(tmp_basis)
+            self.full_atoms = np.array(self.atoms)
             self.atoms = np.array(tmp_atoms)
             del tmp_moments
             del tmp_basis
@@ -349,13 +352,13 @@ class RsptData:
         for row in self.lattice:
             print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
         print("Basis vectors:")
-        for row in self.basis:
+        for row in self.full_basis:
             print(f"{row[0]:10.6f} {row[1]:10.6f} {row[2]:10.6f}")
         print("Species: ", self.species)
-        # print("Magnetic moments:")
-        # print(self.moments)
+        print("Magnetic moments:")
+        print(self.full_moments)
 
-        cell = (self.lattice, self.basis, self.species, self.moments)
+        cell = (self.lattice, self.full_basis, self.species, self.full_moments)
         # Get the symmetry data
         symmetry_data = spg.get_symmetry_dataset(cell=cell)
         # Print the symmetry data
