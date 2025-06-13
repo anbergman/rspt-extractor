@@ -1,6 +1,6 @@
 # RSPt Extractor
 
-**Version:** 0.4.0
+**Version:** 1.0.0
 **Author:** Anders Bergman
 
 ## Overview
