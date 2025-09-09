@@ -16,6 +16,129 @@ from .rspt_extract import (
     extract_lattice_scf,
 )
 
+# Simple periodic table: index = atomic number, value = element symbol
+ELEMENTS = [
+    "X",
+    "H",
+    "He",
+    "Li",
+    "Be",
+    "B",
+    "C",
+    "N",
+    "O",
+    "F",
+    "Ne",
+    "Na",
+    "Mg",
+    "Al",
+    "Si",
+    "P",
+    "S",
+    "Cl",
+    "Ar",
+    "K",
+    "Ca",
+    "Sc",
+    "Ti",
+    "V",
+    "Cr",
+    "Mn",
+    "Fe",
+    "Co",
+    "Ni",
+    "Cu",
+    "Zn",
+    "Ga",
+    "Ge",
+    "As",
+    "Se",
+    "Br",
+    "Kr",
+    "Rb",
+    "Sr",
+    "Y",
+    "Zr",
+    "Nb",
+    "Mo",
+    "Tc",
+    "Ru",
+    "Rh",
+    "Pd",
+    "Ag",
+    "Cd",
+    "In",
+    "Sn",
+    "Sb",
+    "Te",
+    "I",
+    "Xe",
+    "Cs",
+    "Ba",
+    "La",
+    "Ce",
+    "Pr",
+    "Nd",
+    "Pm",
+    "Sm",
+    "Eu",
+    "Gd",
+    "Tb",
+    "Dy",
+    "Ho",
+    "Er",
+    "Tm",
+    "Yb",
+    "Lu",
+    "Hf",
+    "Ta",
+    "W",
+    "Re",
+    "Os",
+    "Ir",
+    "Pt",
+    "Au",
+    "Hg",
+    "Tl",
+    "Pb",
+    "Bi",
+    "Po",
+    "At",
+    "Rn",
+    "Fr",
+    "Ra",
+    "Ac",
+    "Th",
+    "Pa",
+    "U",
+    "Np",
+    "Pu",
+    "Am",
+    "Cm",
+    "Bk",
+    "Cf",
+    "Es",
+    "Fm",
+    "Md",
+    "No",
+    "Lr",
+    "Rf",
+    "Db",
+    "Sg",
+    "Bh",
+    "Hs",
+    "Mt",
+    "Ds",
+    "Rg",
+    "Cn",
+    "Nh",
+    "Fl",
+    "Mc",
+    "Lv",
+    "Ts",
+    "Og",
+]
+
 
 class RsptData:
     """
@@ -232,6 +355,112 @@ class RsptData:
         np.savetxt(
             output_path, np.array(posdata), fmt="%4d %4d  % 10.6f % 10.6f % 10.6f"
         )
+
+    def print_poscar(self, output_path, comment=None):
+        """
+        Write a VASP POSCAR file using direct (fractional) coordinates.
+
+        The lattice vectors are converted from atomic units (Bohr) to
+        Angstrom using `self.bohr_to_angstrom` and written as the POSCAR
+        lattice. The basis positions in `self.basis` are assumed to be
+        fractional (direct) coordinates and are written under the
+        `Direct` label. Species and counts are inferred from the instance's
+        species/atoms data when available; otherwise a generic element
+        label `X` is used.
+
+        Args:
+            output_path (str): Path to the output POSCAR file.
+            comment (str, optional): Optional comment/label for the POSCAR
+                first line. If not provided a default header is written.
+
+        Returns:
+            None
+        """
+        # Prepare header
+        header = (
+            comment
+            if comment is not None
+            else f"RsptData POSCAR (alat={self.alat * self.bohr_to_angstrom:.3f} Å)"
+        )
+
+        # Prepare atom species for the (possibly filtered) atom list
+        # Determine which atom indices are currently active
+        if hasattr(self, "atoms") and self.atoms is not None:
+            try:
+                atom_indices = list(map(int, list(self.atoms)))
+            except Exception:
+                atom_indices = list(range(len(self.basis)))
+        else:
+            atom_indices = list(range(len(self.basis)))
+
+        species_for_atoms = None
+        if getattr(self, "species", None):
+            try:
+                species_for_atoms = [self.species[i] for i in atom_indices]
+            except Exception:
+                species_for_atoms = None
+
+        # If species are not available, fallback to single generic element
+        if not species_for_atoms:
+            nat = len(self.basis)
+            element_list = ["X"]
+            counts = [nat]
+            species_for_atoms = ["X"] * nat
+        else:
+            # Convert species identifiers to element symbols and count them
+            mapped = [self._species_to_symbol(s) for s in species_for_atoms]
+            element_list = []
+            counts = []
+            for s in mapped:
+                if s not in element_list:
+                    element_list.append(s)
+                    counts.append(1)
+                else:
+                    counts[element_list.index(s)] += 1
+
+        # Build POSCAR text lines
+        lines = []
+        lines.append(header)
+        lines.append(str(self.alat * self.bohr_to_angstrom))
+        for vec in self.lattice:
+            lines.append(f"{vec[0]:16.10f} {vec[1]:16.10f} {vec[2]:16.10f}")
+        lines.append(" ".join(element_list))
+        lines.append(" ".join(str(c) for c in counts))
+        lines.append("Direct")
+
+        # Basis positions are assumed to be direct/fractional
+        for pos in np.array(self.basis, dtype=float):
+            lines.append(f"{pos[0]:16.10f} {pos[1]:16.10f} {pos[2]:16.10f}")
+
+        # Write file
+        with open(output_path, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+
+    def _species_to_symbol(self, s):
+        """
+        Convert a species identifier to an element symbol.
+
+        Accepts integer atomic numbers (1..Z) or string labels and returns a
+        chemical symbol. Falls back to the string representation if unknown.
+        """
+        # If it's an integer or can be interpreted as one, map via ELEMENTS
+        try:
+            ani = int(s)
+            if 0 <= ani < len(ELEMENTS):
+                return ELEMENTS[ani]
+        except Exception:
+            pass
+
+        # If it's already a string like 'Fe' or '26', return cleaned string
+        s_str = str(s).strip()
+        # If it looks like a number, try mapping
+        if s_str.isdigit():
+            idx = int(s_str)
+            if 0 <= idx < len(ELEMENTS):
+                return ELEMENTS[idx]
+
+        # Otherwise return as-is
+        return s_str
 
     def print_moments(self, output_path):
         """

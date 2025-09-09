@@ -1,6 +1,6 @@
 # RSPt Extractor
 
-**Version:** 1.0.0    **Author:** Anders Bergman   
+**Version:** 1.0.0    **Author:** Anders Bergman
 Please cite:   [![DOI](https://zenodo.org/badge/874278359.svg)](https://doi.org/10.5281/zenodo.15656215)
 
 ## Overview
@@ -135,6 +135,7 @@ After a successful run, `rspt-parser` should create the following set of files:
 - `posfile`: Positions in the unit cells for the included atoms
 - `momfile`: Moment magnitudes for the included atoms in the unit cell
 - `jfile`: Scalar representation of Jij exchange interactions
+ - `POSCAR`: (optional) VASP POSCAR file containing the lattice and atomic positions
 
 For relativistic workflows the additional files are also included:
 
@@ -143,3 +144,10 @@ For relativistic workflows the additional files are also included:
 - `jfile.tensor`: Full tensor containing Jij, DMI, and SAI for all interactions.
 
 All files follows the conventions for `UppASD` inputs.
+
+## POSCAR notes
+
+- The generated `POSCAR` follows the convention of the RSPt input files, with the difference that the length unit of choice is Å.
+- Atomic positions are written in `Direct` (fractional) coordinates by default.
+- The element/species line in the POSCAR is populated from the SCF species information when
+  available; otherwise a generic label `X` is used.

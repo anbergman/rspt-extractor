@@ -204,6 +204,8 @@ def rspt_relativistic_workflow(args):
         # Print the lattice, basis, and moments information
         scf_data.print_lattice("lattice.dat")
         scf_data.print_positions("posfile")
+        if args.poscar:
+            scf_data.print_poscar("POSCAR")
         scf_data.print_moments("momfile")
         scf_data.print_template(
             "posfile", "momfile", "jfile", "inpsd.dat", mtype=args.maptype
@@ -309,6 +311,8 @@ def rspt_scalar_workflow(args):
         # Print the lattice, basis, and moments information
         scf_data.print_lattice("lattice.dat")
         scf_data.print_positions("posfile")
+        if args.poscar:
+            scf_data.print_poscar("POSCAR")
         scf_data.print_moments("momfile")
 
         scf_data.print_template(
@@ -439,6 +443,12 @@ def main():
         "--cutoff",
         type=float,
         help="Radius for excange interaction cutoff",
+    )
+
+    parser.add_argument(
+        "--poscar",
+        action="store_true",
+        help="Write a VASP POSCAR file (default: off)",
     )
 
     # Parse the arguments
