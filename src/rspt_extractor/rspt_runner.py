@@ -421,7 +421,7 @@ def main():
         "-m",
         "--maptype",
         type=str,
-        default="C",
+        default="D",
         help="Output maptype: (C)artesian, (D)irect or maptype (3)",
     )
     parser.add_argument(

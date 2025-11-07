@@ -1,7 +1,7 @@
 # RSPt Extractor
 
 **Version:** 1.0.0    **Author:** Anders Bergman
-Please cite:   [![DOI](https://zenodo.org/badge/874278359.svg)](https://doi.org/10.5281/zenodo.15656215)
+**Reference:** [![DOI](https://zenodo.org/badge/874278359.svg)](https://doi.org/10.5281/zenodo.15656215)
 
 ## Overview
 
